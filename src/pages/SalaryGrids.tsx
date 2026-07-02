@@ -42,7 +42,7 @@ export default function SalaryGrids() {
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Supprimer cette grille salariale ?')) return
+    // Suppression directe
     await supabase.from('salary_grids').delete().eq('id', id); fetchData()
   }
 

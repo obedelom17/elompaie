@@ -62,7 +62,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signIn = async (email: string, password: string) => {
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
+      if (error) return { error: toMsg(error) }
       return { error: null }
+    } catch (e) { return { error: toMsg(e) } }
   }
 
   const signUp = async (email: string, password: string, orgName: string) => {
@@ -76,6 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!data?.user) return { error: 'Compte non créé — réessayez.' }
       if (data.user.identities?.length === 0) return { error: 'Email déjà utilisé.' }
       return { error: null }
+    } catch (e) { return { error: toMsg(e) } }
   }
 
   const signOut = async () => { await supabase.auth.signOut(); setOrg(null) }

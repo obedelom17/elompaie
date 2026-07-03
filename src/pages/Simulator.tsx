@@ -164,11 +164,11 @@ export default function Simulator() {
               <div className="space-y-2 text-sm">
                 <Row l="Salaire brut" v={result.gross_salary} />
                 <Row l="CNSS salarié (4%)" v={result.cnss_employee} neg />
-                <Row l="INAM salarié (5%)" v={result.inam_employee} neg />
-                <Row l="Abattement 28% (Art.26)" v={result.abattement_28} neg muted />
+                <Row l="AMU salarié (5%)" v={result.amu_employee} neg />
+                <Row l="Abattement 28%" v={result.abattement_28} neg muted />
                 <Row l={`Charges famille (${form.children_count + (form.marital_status === 'marie' ? 1 : 0)} pers.)`} v={result.charges_famille} neg muted />
                 <Row l="Revenu imposable / mois" v={result.taxable_income_monthly} muted />
-                <Row l="ITS (Art.74 CGI 2025)" v={result.its_net} neg />
+                <Row l="IRPP mensuel" v={result.irpp_net} neg />
                 {form.salary_advance > 0 && <Row l="Avance sur salaire" v={form.salary_advance} neg />}
                 {form.loan_payment > 0 && <Row l="Remboursement prêt" v={form.loan_payment} neg />}
                 <div className="border-t-2 border-primary-100 pt-3 mt-3">
@@ -183,7 +183,7 @@ export default function Simulator() {
                 <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-2">Charges patronales</p>
                 <div className="space-y-1 text-sm">
                   <Row l="CNSS employeur (17,5%)" v={result.cnss_employer} muted />
-                  <Row l="INAM employeur (5%)" v={result.inam_employer} muted />
+                  <Row l="AMU employeur (5%)" v={result.amu_employer} muted />
                   <Row l="Total charges patronales" v={result.employer_total} bold />
                   <div className="border-t border-slate-100 pt-2">
                     <Row l="Coût total employeur" v={result.gross_salary + result.employer_total} bold />
@@ -192,7 +192,7 @@ export default function Simulator() {
               </div>
 
               <div className="mt-4 p-3 bg-slate-50 rounded-xl text-xs text-slate-400">
-                Revenu imposable annuel : {formatXOF(result.taxable_income_annual)} · ITS annuel : {formatXOF(result.its_net * 12)}
+                Revenu imposable annuel : {formatXOF(result.taxable_income_annual)} · IRPP annuel : {formatXOF(result.irpp_net * 12)}
               </div>
             </div>
           ) : (
@@ -230,7 +230,7 @@ export default function Simulator() {
           </div>
 
           <div className="card p-6 space-y-5">
-            <h3 className="font-bold text-slate-900">Résultat (Art. 97 Code Travail 2021)</h3>
+            <h3 className="font-bold text-slate-900">Résultat</h3>
 
             <div className="space-y-3">
               {sevYears >= 1 && (
@@ -254,7 +254,7 @@ export default function Simulator() {
 
               <div className="flex items-start gap-2 p-3 bg-slate-50 rounded-xl text-xs text-slate-500">
                 <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                <span>Art. 97 CT 2021 · Hors congés payés dus, indemnité de préavis et préjudice éventuel</span>
+                <span>Hors congés payés dus, indemnité de préavis et préjudice éventuel</span>
               </div>
             </div>
           </div>
@@ -305,8 +305,8 @@ export default function Simulator() {
                 <div className="p-4 text-center font-bold text-violet-700 bg-violet-50">Profil B</div>
                 {[
                   ['Salaire brut', result.gross_salary, resultB.gross_salary],
-                  ['CNSS + INAM salarié', result.cnss_employee + result.inam_employee, resultB.cnss_employee + resultB.inam_employee],
-                  ['ITS mensuel', result.its_net, resultB.its_net],
+                  ['CNSS + AMU salarié', result.cnss_employee + result.amu_employee, resultB.cnss_employee + resultB.amu_employee],
+                  ['IRPP mensuel', result.irpp_net, resultB.irpp_net],
                   ['NET À PAYER', result.net_payable, resultB.net_payable],
                   ['Charges patronales', result.employer_total, resultB.employer_total],
                   ['Coût employeur total', result.gross_salary + result.employer_total, resultB.gross_salary + resultB.employer_total],

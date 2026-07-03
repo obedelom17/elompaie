@@ -2,19 +2,20 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
-import { Building2, Users, CalendarClock, TrendingUp, ArrowRight, Zap, AlertCircle, CheckCircle2, Clock } from 'lucide-react'
+import { Building2, Users, CalendarClock, TrendingUp, ArrowRight, Zap, AlertCircle, CheckCircle2, Clock, Rocket } from 'lucide-react'
 import { CountUp } from '../components/ui/CountUp'
 import { CardSkeleton } from '../components/ui/Skeleton'
 import { formatXOF } from '../lib/payroll'
+import { Onboarding } from '../components/Onboarding'
 
 interface Stats { clientCount: number; employeeCount: number; openPeriods: number; closedPeriods: number; totalNetPay: number; totalEmployer: number }
-interface RecentActivity { type: string; label: string; sub: string; time: string; color: string }
 
 export default function Dashboard() {
   const { org } = useAuth()
   const [stats, setStats] = useState<Stats | null>(null)
   const [recentPeriods, setRecentPeriods] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [showOnboarding, setShowOnboarding] = useState(false)
 
   useEffect(() => { if (org) fetchStats() }, [org])
 
@@ -22,7 +23,11 @@ export default function Dashboard() {
     if (!org) return
     const { data: clients } = await supabase.from('clients').select('id').eq('organization_id', org.id)
     const clientIds = (clients || []).map(c => c.id)
-    if (clientIds.length === 0) { setStats({ clientCount: 0, employeeCount: 0, openPeriods: 0, closedPeriods: 0, totalNetPay: 0, totalEmployer: 0 }); setLoading(false); return }
+    if (clientIds.length === 0) {
+      setStats({ clientCount: 0, employeeCount: 0, openPeriods: 0, closedPeriods: 0, totalNetPay: 0, totalEmployer: 0 })
+      setLoading(false)
+      return
+    }
 
     const [empRes, openRes, closedRes, periodsRes] = await Promise.all([
       supabase.from('employees').select('id', { count: 'exact' }).in('client_id', clientIds).eq('active', true),
@@ -34,9 +39,9 @@ export default function Dashboard() {
     const periodIds = [...(openRes.data || []), ...(closedRes.data || [])].map(p => p.id)
     let totalNet = 0, totalEmp = 0
     if (periodIds.length > 0) {
-      const { data: vars } = await supabase.from('payroll_variables').select('net_payable, cnss_employer, inam_employer').in('period_id', periodIds).eq('status', 'calculated')
+      const { data: vars } = await supabase.from('payroll_variables').select('net_payable, cnss_employer, amu_employer').in('period_id', periodIds).eq('status', 'calculated')
       totalNet = (vars || []).reduce((s, v) => s + (v.net_payable || 0), 0)
-      totalEmp = (vars || []).reduce((s, v) => s + (v.cnss_employer || 0) + (v.inam_employer || 0), 0)
+      totalEmp = (vars || []).reduce((s, v) => s + (v.cnss_employer || 0) + (v.amu_employer || 0), 0)
     }
 
     setStats({ clientCount: clientIds.length, employeeCount: empRes.count || 0, openPeriods: openRes.count || 0, closedPeriods: closedRes.count || 0, totalNetPay: totalNet, totalEmployer: totalEmp })
@@ -44,11 +49,11 @@ export default function Dashboard() {
     setLoading(false)
   }
 
+  const handleOnboardingDone = () => { setShowOnboarding(false); fetchStats() }
+
   if (loading) return (
     <div className="space-y-6 page-enter">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[...Array(4)].map((_, i) => <CardSkeleton key={i} />)}
-      </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">{[...Array(4)].map((_, i) => <CardSkeleton key={i} />)}</div>
     </div>
   )
 
@@ -61,7 +66,8 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8 page-enter">
-      {/* Header */}
+      {showOnboarding && <Onboarding onDone={handleOnboardingDone} />}
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-black text-slate-900 tracking-tight">Tableau de bord</h1>
@@ -70,12 +76,36 @@ export default function Dashboard() {
             {org?.name}
           </p>
         </div>
-        <Link to="/payroll" className="btn-primary gap-2 shadow-glow-sm">
-          <Zap className="w-4 h-4" /> Traiter une paie
-        </Link>
+        <div className="flex gap-2">
+          {stats!.clientCount === 0 && (
+            <button onClick={() => setShowOnboarding(true)} className="btn-secondary gap-2">
+              <Rocket className="w-4 h-4" /> Démarrage rapide
+            </button>
+          )}
+          <Link to="/payroll" className="btn-primary gap-2 shadow-glow-sm">
+            <Zap className="w-4 h-4" /> Traiter une paie
+          </Link>
+        </div>
       </div>
 
-      {/* Stat cards */}
+      {/* Onboarding banner si aucun client */}
+      {stats!.clientCount === 0 && (
+        <div className="card p-6 border border-primary-200 bg-primary-50/50">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-primary-100 flex items-center justify-center">
+              <Rocket className="w-6 h-6 text-primary-600" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-bold text-slate-900">Bienvenue sur ObedPaie !</h3>
+              <p className="text-sm text-slate-500 mt-0.5">Commencez par créer un client, ajouter un employé, puis ouvrir une période de paie.</p>
+            </div>
+            <button onClick={() => setShowOnboarding(true)} className="btn-primary">
+              Démarrer <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         {statCards.map((card, i) => (
           <Link key={card.label} to={card.to}
@@ -100,7 +130,6 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Périodes récentes */}
         <div className="lg:col-span-2 card p-6">
           <div className="flex items-center justify-between mb-5">
             <h2 className="font-bold text-slate-900 flex items-center gap-2">
@@ -111,19 +140,12 @@ export default function Dashboard() {
             </Link>
           </div>
           {recentPeriods.length === 0
-            ? <div className="text-center py-10 text-slate-400">
-                <CalendarClock className="w-10 h-10 mx-auto mb-2 opacity-30" />
-                <p className="text-sm">Aucune période créée.</p>
-              </div>
+            ? <div className="text-center py-10 text-slate-400"><CalendarClock className="w-10 h-10 mx-auto mb-2 opacity-30" /><p className="text-sm">Aucune période créée.</p></div>
             : <div className="space-y-2">
                 {recentPeriods.map(p => (
-                  <Link key={p.id} to={`/payroll/${p.id}`}
-                    className="flex items-center gap-4 p-3 rounded-xl hover:bg-slate-50 transition-colors group">
+                  <Link key={p.id} to={`/payroll/${p.id}`} className="flex items-center gap-4 p-3 rounded-xl hover:bg-slate-50 transition-colors group">
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${p.status === 'open' ? 'bg-amber-100' : 'bg-emerald-100'}`}>
-                      {p.status === 'open'
-                        ? <Clock className="w-5 h-5 text-amber-600" />
-                        : <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-                      }
+                      {p.status === 'open' ? <Clock className="w-5 h-5 text-amber-600" /> : <CheckCircle2 className="w-5 h-5 text-emerald-600" />}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-slate-900 text-sm group-hover:text-primary-600 transition-colors">
@@ -131,17 +153,13 @@ export default function Dashboard() {
                       </p>
                       <p className="text-xs text-slate-500">{p.clients?.name}</p>
                     </div>
-                    {p.status === 'open'
-                      ? <span className="badge-warning">Ouverte</span>
-                      : <span className="badge-success">Clôturée</span>
-                    }
+                    {p.status === 'open' ? <span className="badge-warning">Ouverte</span> : <span className="badge-success">Clôturée</span>}
                   </Link>
                 ))}
               </div>
           }
         </div>
 
-        {/* Actions rapides */}
         <div className="card p-6">
           <h2 className="font-bold text-slate-900 mb-5 flex items-center gap-2">
             <Zap className="w-5 h-5 text-primary-500" /> Actions rapides
@@ -151,42 +169,31 @@ export default function Dashboard() {
               { to: '/clients', icon: Building2, label: 'Nouveau client', sub: 'Ajouter une entreprise', color: 'text-blue-600 bg-blue-50 hover:bg-blue-100' },
               { to: '/employees', icon: Users, label: 'Nouvel employé', sub: 'Enregistrer un salarié', color: 'text-violet-600 bg-violet-50 hover:bg-violet-100' },
               { to: '/payroll', icon: CalendarClock, label: 'Nouvelle période', sub: 'Ouvrir un mois de paie', color: 'text-amber-600 bg-amber-50 hover:bg-amber-100' },
-              { to: '/salary-grids', icon: TrendingUp, label: 'Grilles salariales', sub: 'Gérer les barèmes', color: 'text-emerald-600 bg-emerald-50 hover:bg-emerald-100' },
+              { to: '/activity', icon: Clock, label: 'Journal activité', sub: 'Voir les dernières actions', color: 'text-slate-600 bg-slate-50 hover:bg-slate-100' },
             ].map(item => (
-              <Link key={item.to} to={item.to}
-                className={`flex items-center gap-3 p-3 rounded-xl transition-all duration-200 group ${item.color}`}>
-                <div className="w-9 h-9 rounded-lg bg-white/60 flex items-center justify-center flex-shrink-0">
-                  <item.icon className="w-4 h-4" />
-                </div>
-                <div className="flex-1">
-                  <p className="font-semibold text-sm">{item.label}</p>
-                  <p className="text-xs opacity-70">{item.sub}</p>
-                </div>
+              <Link key={item.to} to={item.to} className={`flex items-center gap-3 p-3 rounded-xl transition-all duration-200 group ${item.color}`}>
+                <div className="w-9 h-9 rounded-lg bg-white/60 flex items-center justify-center flex-shrink-0"><item.icon className="w-4 h-4" /></div>
+                <div className="flex-1"><p className="font-semibold text-sm">{item.label}</p><p className="text-xs opacity-70">{item.sub}</p></div>
                 <ArrowRight className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" />
               </Link>
             ))}
           </div>
-
-          {/* Résumé charges */}
           {stats!.totalEmployer > 0 && (
             <div className="mt-5 pt-5 border-t border-slate-100">
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Charges patronales totales</p>
               <p className="text-2xl font-black text-slate-900">{formatXOF(stats!.totalEmployer)}</p>
-              <p className="text-xs text-slate-400 mt-1">CNSS + INAM employeur</p>
+              <p className="text-xs text-slate-400 mt-1">CNSS + AMU employeur</p>
             </div>
           )}
         </div>
       </div>
 
-      {/* Alerte info légale */}
       <div className="card p-4 border-l-4 border-l-primary-500 bg-primary-50/50">
         <div className="flex items-start gap-3">
           <AlertCircle className="w-5 h-5 text-primary-600 flex-shrink-0 mt-0.5" />
           <div>
             <p className="text-sm font-semibold text-primary-900">Conformité CGI OTR 2025</p>
-            <p className="text-xs text-primary-700 mt-0.5">
-              Barème ITS annuel (Art. 74) · Abattement 28% (Art. 26) · Charges famille 10 000 F/pers/mois (Art. 73) · CNSS 4%+17,5% · INAM 5%+5%
-            </p>
+            <p className="text-xs text-primary-700 mt-0.5">CNSS 4%+17,5% · AMU 5%+5%</p>
           </div>
         </div>
       </div>

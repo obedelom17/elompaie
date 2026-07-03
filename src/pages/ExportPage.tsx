@@ -39,7 +39,7 @@ export default function ExportPage() {
       if (!vars || !period) return
 
       // Génération CSV (compatible Excel)
-      const headers = ['Matricule','Nom','Prénom','Poste','Brut','CNSS Salarié','INAM Salarié','Abattement 28%','Charges Famille','Revenu Imposable','ITS','Avance','Prêt','Net à payer','CNSS Employeur','INAM Employeur','Charges Patronales','Coût Total']
+      const headers = ['Matricule','Nom','Prénom','Poste','Brut','CNSS Salarié','AMU Salarié','Abattement 28%','Charges Famille','Revenu Imposable','IRPP','Avance','Prêt','Net à payer','CNSS Employeur','AMU Employeur','Charges Patronales','Coût Total']
       const rows = vars.map(v => {
         const emp = v.employees as any
         const calc = calculatePayroll({
@@ -52,10 +52,10 @@ export default function ExportPage() {
         })
         return [
           emp?.matricule || '', emp?.last_name || '', emp?.first_name || '', emp?.position || '',
-          calc.gross_salary, calc.cnss_employee, calc.inam_employee, calc.abattement_28,
-          calc.charges_famille, calc.taxable_income_monthly, calc.its_net,
+          calc.gross_salary, calc.cnss_employee, calc.amu_employee, calc.abattement_28,
+          calc.charges_famille, calc.taxable_income_monthly, calc.irpp_net,
           v.salary_advance, v.loan_payment, calc.net_payable,
-          calc.cnss_employer, calc.inam_employer, calc.employer_total,
+          calc.cnss_employer, calc.amu_employer, calc.employer_total,
           calc.gross_salary + calc.employer_total
         ]
       })

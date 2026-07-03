@@ -101,3 +101,41 @@
 /* Number inputs */
 input[type=number]::-webkit-inner-spin-button,
 input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+
+/* ── MODE SOMBRE ────────────────────────────────────────────────────── */
+@layer base {
+  .dark body { @apply bg-slate-950 text-slate-100; }
+  .dark .card { @apply bg-slate-900 border-slate-800; }
+  .dark .card-glass { @apply bg-slate-900/80 border-slate-700/60; }
+  .dark .input { @apply bg-slate-800 border-slate-700 text-slate-100 placeholder-slate-500 hover:border-slate-600 focus:border-primary-500; }
+  .dark .label { @apply text-slate-400; }
+  .dark .btn-secondary { @apply bg-slate-800 text-slate-200 border-slate-700 hover:border-primary-500 hover:text-primary-400 hover:bg-slate-700; }
+  .dark .btn-ghost { @apply text-slate-400 hover:bg-slate-800 hover:text-slate-200; }
+  .dark .table-row { @apply border-slate-800 hover:bg-slate-800/50; }
+  .dark .modal { @apply bg-slate-900 border border-slate-700; }
+  .dark .modal-overlay { @apply bg-slate-950/80; }
+  .dark .stat-card { @apply bg-slate-900 border-slate-800; }
+  .dark h1, .dark h2, .dark h3 { @apply text-slate-100; }
+  .dark p.text-slate-500 { @apply text-slate-400; }
+  .dark .badge-success { @apply bg-emerald-900/40 text-emerald-400 ring-emerald-800; }
+  .dark .badge-warning { @apply bg-amber-900/40 text-amber-400 ring-amber-800; }
+  .dark select { @apply bg-slate-800 border-slate-700 text-slate-100; }
+}
+
+/* ── FIL D'ARIANE ────────────────────────────────────────────────────── */
+.breadcrumb { @apply flex items-center gap-1.5 text-xs text-slate-400 mb-4 flex-wrap; }
+.breadcrumb a { @apply hover:text-primary-600 transition-colors; }
+.breadcrumb span.sep { @apply text-slate-300; }
+.breadcrumb span.current { @apply text-slate-700 font-medium; }
+.dark .breadcrumb span.current { @apply text-slate-300; }
+
+/* ── PAGINATION ──────────────────────────────────────────────────────── */
+.pagination { @apply flex items-center gap-1 mt-4 justify-center; }
+.pagination button { @apply px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-150; }
+.pagination button.active { @apply bg-primary-600 text-white; }
+.pagination button:not(.active) { @apply bg-white border border-slate-200 text-slate-600 hover:border-primary-300 hover:text-primary-600; }
+.dark .pagination button:not(.active) { @apply bg-slate-800 border-slate-700 text-slate-300; }
+
+/* ── SKELETON (complément) ─────────────────────────────────────────── */
+.skeleton-line { @apply h-3 bg-slate-200 rounded-full animate-pulse; }
+.dark .skeleton-line { @apply bg-slate-700; }

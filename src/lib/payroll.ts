@@ -1,9 +1,9 @@
 // Moteur de calcul de paie - Togo
-// CGI OTR 2025 (Art. 26, 73, 74) + Code du Travail 2021
+
 
 export interface PayrollInput {
   base_salary: number
-  overtime_hours?: number        // heures supp Art.98 CT
+  overtime_hours?: number
   overtime_rate?: 'h1' | 'h2' | 'h3' // +15% / +50% / +100%
   overtime_premium: number
   pregnancy_allowance: number
@@ -24,31 +24,31 @@ export interface PayrollInput {
 export interface PayrollResult {
   gross_salary: number
   cnss_employee: number
-  inam_employee: number
+  amu_employee: number
   abattement_28: number
   charges_famille: number
   taxable_income_annual: number
   taxable_income_monthly: number
-  its_brut: number
-  its_net: number
+  irpp_brut: number
+  irpp_net: number
   total_deductions: number
   net_payable: number
   cnss_employer: number
-  inam_employer: number
+  amu_employer: number
   employer_total: number
   overtime_amount: number
   // compat DB
   ricf: number
   taxable_income: number
-  its_brut_display: number
+  irpp_brut_display: number
 }
 
 const CNSS_EMPLOYEE_RATE  = 0.04
 const CNSS_EMPLOYER_RATE  = 0.175
-const INAM_EMPLOYEE_RATE  = 0.05
-const INAM_EMPLOYER_RATE  = 0.05
+const AMU_EMPLOYEE_RATE  = 0.05
+const AMU_EMPLOYER_RATE  = 0.05
 
-// Barème ITS annuel - Art.74 CGI 2025
+// Barème IRPP annuel
 const ITS_BRACKETS = [
   { min: 0,          max: 900_000,    rate: 0 },
   { min: 900_000,    max: 3_000_000,  rate: 0.03 },
@@ -74,7 +74,7 @@ function calcItsBrutAnnual(revenu: number): number {
   return Math.floor(its / 10) * 10
 }
 
-// Heures supplémentaires - Art.98 Code Travail 2021
+// Heures supplémentaires
 // h1=+15% (41-48h), h2=+50% (nuit/dim), h3=+100% (nuit dim/férié)
 export function calcOvertimePay(baseSalary: number, hours: number, rate: 'h1'|'h2'|'h3' = 'h1'): number {
   const hourlyRate = baseSalary / 173.33
@@ -82,7 +82,7 @@ export function calcOvertimePay(baseSalary: number, hours: number, rate: 'h1'|'h
   return Math.round(hourlyRate * hours * multiplier)
 }
 
-// Congés payés - Art.149 CT: 2,5 jours/mois ouvrés
+// Congés payés : 2,5 jours/mois ouvrés
 export function calcCongesPayes(baseSalary: number, monthsWorked: number): number {
   const joursAcquis = 2.5 * monthsWorked
   const indemnite = (baseSalary / 30) * joursAcquis
@@ -122,9 +122,9 @@ export function calculatePayroll(input: PayrollInput): PayrollResult {
     (input.exceptional_bonus  || 0)
 
   const cnss_employee = Math.round(gross_salary * CNSS_EMPLOYEE_RATE)
-  const inam_employee = Math.round(gross_salary * INAM_EMPLOYEE_RATE)
+  const amu_employee = Math.round(gross_salary * AMU_EMPLOYEE_RATE)
 
-  const revenuApresCot = gross_salary - cnss_employee - inam_employee - (input.flat_deduction || 0)
+  const revenuApresCot = gross_salary - cnss_employee - amu_employee - (input.flat_deduction || 0)
   const revenuAnnuel   = revenuApresCot * 12
   const baseAbat       = Math.min(revenuAnnuel, 10_000_000)
   const abat_annual    = Math.round(baseAbat * 0.28)
@@ -136,34 +136,34 @@ export function calculatePayroll(input: PayrollInput): PayrollResult {
   const charges_famille  = personnes * 10_000
 
   const revImposable = Math.floor(Math.max(0, revApresAbat - chargesFamAnnual) / 1000) * 1000
-  const its_annuel   = calcItsBrutAnnual(revImposable)
-  const its_net      = Math.round(its_annuel / 12)
-  const its_brut     = its_net
+  const irpp_annuel   = calcItsBrutAnnual(revImposable)
+  const irpp_net      = Math.round(irpp_annuel / 12)
+  const irpp_brut     = irpp_net
 
   const total_deductions =
-    cnss_employee + inam_employee + its_net +
+    cnss_employee + amu_employee + irpp_net +
     (input.salary_advance || 0) + (input.loan_payment || 0)
 
   const net_payable    = gross_salary - total_deductions
   const cnss_employer  = Math.round(gross_salary * CNSS_EMPLOYER_RATE)
-  const inam_employer  = Math.round(gross_salary * INAM_EMPLOYER_RATE)
+  const amu_employer  = Math.round(gross_salary * AMU_EMPLOYER_RATE)
 
   return {
-    gross_salary, cnss_employee, inam_employee,
+    gross_salary, cnss_employee, amu_employee,
     abattement_28, charges_famille,
     taxable_income_annual: revImposable,
     taxable_income_monthly: Math.round(revImposable / 12),
-    its_brut, its_net, total_deductions, net_payable,
-    cnss_employer, inam_employer,
-    employer_total: cnss_employer + inam_employer,
+    irpp_brut, irpp_net, total_deductions, net_payable,
+    cnss_employer, amu_employer,
+    employer_total: cnss_employer + amu_employer,
     overtime_amount,
     ricf: charges_famille,
     taxable_income: Math.round(revImposable / 12),
-    its_brut_display: its_brut,
+    irpp_brut_display: irpp_brut,
   }
 }
 
-// Indemnité licenciement - Art.97 CT 2021
+// Indemnité licenciement
 export function calculateSeverancePay(grossMonthlySalary: number, yearsOfService: number): number {
   if (yearsOfService < 1) return 0
   let ind = Math.min(yearsOfService, 5) * grossMonthlySalary * 0.35
@@ -172,7 +172,7 @@ export function calculateSeverancePay(grossMonthlySalary: number, yearsOfService
   return Math.round(ind)
 }
 
-// Préavis - Art.74 CT 2021
+// Préavis
 export function getPreavisDays(category: string): string {
   const c = category.toLowerCase()
   if (c.includes('heure') || c.includes('journalier')) return '15 jours'
@@ -189,16 +189,67 @@ export const MONTH_NAMES = [
   'Juillet','Août','Septembre','Octobre','Novembre','Décembre'
 ]
 
-// NOTE LÉGALE HEURES SUPPLÉMENTAIRES (Art. 180 CT 2021)
+
 // Les taux de majoration sont fixés par conventions collectives.
 // En l'absence de convention: +25% standard, +50% nuit/dimanche, +100% dimanche/férié de nuit
 // (pratique courante Togo en l'absence de convention collective applicable)
 export const OT_RATES_LABEL = {
-  h1: '+25% (heures supp. jour — Art.180 CT 2021)',
+  h1: '+25% (heures supp. jour)',
   h2: '+50% (nuit ou dimanche)',
   h3: '+100% (nuit dimanche/férié)',
 }
 
-// Correction Art.72: enfants à charge jusqu'à 25 ans si études/apprentissage
+// Enfants à charge jusqu'à 25 ans si études/apprentissage
 // L'employé doit déclarer cette situation — on garde children_count comme paramètre
 // et on affiche un avertissement dans l'UI si children_count > 0
+
+// ─── INDEMNITÉ MATERNITÉ ───────────────────────────────────────────────────
+// 14 semaines congé maternité. 50% à charge employeur, 50% CNSS.
+export function calcIndemniteMaterniteMensuelle(salaireBase: number): {
+  partEmployeur: number
+  partCNSS: number
+  total: number
+} {
+  const mensuel = Math.round(salaireBase * 0.50)
+  return {
+    partEmployeur: mensuel,
+    partCNSS: mensuel,
+    total: salaireBase,
+  }
+}
+
+// ─── INDEMNITÉ MALADIE ────────────────────────────────────────────────────
+// <1 an : 30j demi-salaire
+// 1–5 ans : 2 mois plein salaire
+// >5 ans : 4 mois plein salaire
+export function calcIndemniteMaladie(
+  salaireBase: number,
+  ancienneteAns: number
+): { dureeLabel: string; montant: number } {
+  if (ancienneteAns < 1) {
+    return { dureeLabel: '30 jours (demi-salaire)', montant: Math.round(salaireBase * 0.5) }
+  } else if (ancienneteAns <= 5) {
+    return { dureeLabel: '2 mois (plein salaire)', montant: Math.round(salaireBase * 2) }
+  } else {
+    return { dureeLabel: '4 mois (plein salaire)', montant: Math.round(salaireBase * 4) }
+  }
+}
+
+// ─── INDEMNITÉ COMPENSATRICE CONGÉS NON PRIS ──────────────────────────────
+// Versée au départ si congés acquis non soldés.
+// Base : 2,5 jours ouvrés/mois travaillé.
+// Montant = (salaire journalier) × jours non pris
+export function calcIndemniteCongésNonPris(
+  salaireMensuelBrut: number,
+  moisTravaillés: number,
+  joursDejaPosésMoisCourant: number = 0
+): { joursAcquis: number; joursNonPris: number; montant: number } {
+  const joursAcquis = 2.5 * moisTravaillés
+  const joursNonPris = Math.max(0, joursAcquis - joursDejaPosésMoisCourant)
+  const tauxJournalier = salaireMensuelBrut / 26 // jours ouvrés/mois
+  return {
+    joursAcquis: Math.round(joursAcquis * 10) / 10,
+    joursNonPris: Math.round(joursNonPris * 10) / 10,
+    montant: Math.round(tauxJournalier * joursNonPris),
+  }
+}

@@ -42,16 +42,16 @@ export default function ExportReports() {
 
     if (!vars?.length) { setExporting(null); alert('Aucun bulletin calculé pour cette période.'); return }
 
-    const headers = ['Matricule','Prénom','Nom','Poste','Catégorie','Salaire Brut','CNSS Salarié','INAM Salarié','ITS','Total Retenues','Net à Payer','CNSS Patron','INAM Patron','Charges Patronales']
+    const headers = ['Matricule','Prénom','Nom','Poste','Catégorie','Salaire Brut','CNSS Salarié','AMU Salarié','IRPP','Total Retenues','Net à Payer','CNSS Patron','AMU Patron','Charges Patronales']
     const rows = vars.map(v => [
       v.employees?.matricule || '',
       v.employees?.first_name || '',
       v.employees?.last_name || '',
       v.employees?.position || '',
       v.employees?.category || '',
-      v.gross_salary, v.cnss_employee, v.inam_employee, v.its_net,
-      v.total_deductions, v.net_payable, v.cnss_employer, v.inam_employer,
-      (v.cnss_employer || 0) + (v.inam_employer || 0)
+      v.gross_salary, v.cnss_employee, v.amu_employee, v.irpp_net,
+      v.total_deductions, v.net_payable, v.cnss_employer, v.amu_employer,
+      (v.cnss_employer || 0) + (v.amu_employer || 0)
     ])
 
     // Totaux
@@ -105,14 +105,14 @@ export default function ExportReports() {
   const PeriodStats = ({ periodId }: { periodId: string }) => {
     const [stats, setStats] = useState<any>(null)
     useEffect(() => {
-      supabase.from('payroll_variables').select('gross_salary, net_payable, cnss_employer, inam_employer').eq('period_id', periodId).eq('status', 'calculated')
+      supabase.from('payroll_variables').select('gross_salary, net_payable, cnss_employer, amu_employer').eq('period_id', periodId).eq('status', 'calculated')
         .then(({ data }) => {
           if (!data?.length) return
           setStats({
             count: data.length,
             totalBrut: data.reduce((s, v) => s + v.gross_salary, 0),
             totalNet: data.reduce((s, v) => s + v.net_payable, 0),
-            totalPatron: data.reduce((s, v) => s + v.cnss_employer + v.inam_employer, 0),
+            totalPatron: data.reduce((s, v) => s + v.cnss_employer + v.amu_employer, 0),
           })
         })
     }, [periodId])

@@ -3,9 +3,13 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import {
   LayoutDashboard, Building2, Users, Grid3x3, CalendarClock,
-  LogOut, Menu, Calculator, Download, FlaskConical, X, ChevronRight
+  LogOut, Menu, Calculator, Download, FlaskConical, X, ChevronRight,
+  Activity, Sun, Moon
 } from 'lucide-react'
 import { AIChatbot } from './AIChatbot'
+import { NotificationBadge } from './NotificationBadge'
+import { useDarkMode } from '../hooks/useDarkMode'
+import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 
 const navItems = [
   { to: '/', label: 'Tableau de bord', icon: LayoutDashboard, end: true },
@@ -15,28 +19,28 @@ const navItems = [
   { to: '/payroll', label: 'Périodes de paie', icon: CalendarClock },
   { to: '/simulator', label: 'Simulateur', icon: FlaskConical },
   { to: '/export', label: 'Export & Rapports', icon: Download },
+  { to: '/activity', label: 'Journal activité', icon: Activity },
 ]
 
 export default function Layout({ children }: { children: ReactNode }) {
   const { org, signOut } = useAuth()
   const navigate = useNavigate()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const { dark, toggle: toggleDark } = useDarkMode()
+  useKeyboardShortcuts()
 
   const handleSignOut = async () => { await signOut(); navigate('/auth') }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex">
-      {/* Overlay mobile */}
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex">
       {sidebarOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-30 lg:hidden animate-fade-in"
           onClick={() => setSidebarOpen(false)} />
       )}
 
-      {/* Sidebar */}
       <aside className={`fixed lg:sticky top-0 left-0 z-40 h-screen w-64 flex flex-col transition-transform duration-300 ease-out ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}
         style={{ background: 'linear-gradient(180deg, #0f1629 0%, #141e38 100%)' }}>
 
-        {/* Logo */}
         <div className="flex items-center justify-between px-5 py-5 border-b border-white/10">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-400 to-accent-500 flex items-center justify-center shadow-glow-sm">
@@ -52,15 +56,12 @@ export default function Layout({ children }: { children: ReactNode }) {
           </button>
         </div>
 
-        {/* Nav */}
         <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
           {navItems.map((item) => (
             <NavLink key={item.to} to={item.to} end={item.end} onClick={() => setSidebarOpen(false)}
               className={({ isActive }) =>
                 `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group ${
-                  isActive
-                    ? 'bg-white/15 text-white shadow-sm'
-                    : 'text-slate-400 hover:bg-white/8 hover:text-white'
+                  isActive ? 'bg-white/15 text-white shadow-sm' : 'text-slate-400 hover:bg-white/8 hover:text-white'
                 }`
               }>
               {({ isActive }) => (
@@ -76,7 +77,13 @@ export default function Layout({ children }: { children: ReactNode }) {
           ))}
         </nav>
 
-        {/* Footer */}
+        {/* Raccourcis clavier hint */}
+        <div className="px-4 py-2 border-t border-white/5">
+          <p className="text-[9px] text-slate-600 leading-relaxed">
+            Ctrl+K Employés · Ctrl+N Paie · Ctrl+D Accueil
+          </p>
+        </div>
+
         <div className="px-3 py-4 border-t border-white/10 space-y-1">
           <div className="px-3 py-2.5 rounded-xl bg-white/5">
             <p className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold">Cabinet</p>
@@ -92,26 +99,30 @@ export default function Layout({ children }: { children: ReactNode }) {
         </div>
       </aside>
 
-      {/* Main */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Mobile header */}
-        <header className="lg:hidden sticky top-0 z-20 bg-white/90 backdrop-blur-sm border-b border-slate-200 px-4 py-3 flex items-center justify-between">
-          <button onClick={() => setSidebarOpen(true)} className="p-2 rounded-xl hover:bg-slate-100 transition-colors">
-            <Menu className="w-5 h-5 text-slate-700" />
+        <header className="sticky top-0 z-20 bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm border-b border-slate-200 dark:border-slate-800 px-4 py-3 flex items-center justify-between">
+          <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+            <Menu className="w-5 h-5 text-slate-700 dark:text-slate-300" />
           </button>
-          <div className="flex items-center gap-2">
+          <div className="lg:hidden flex items-center gap-2">
             <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center">
               <Calculator className="w-4 h-4 text-white" />
             </div>
-            <span className="font-black text-slate-900">ObedPaie</span>
+            <span className="font-black text-slate-900 dark:text-white">ObedPaie</span>
           </div>
-          <div className="w-9" />
+          {/* Spacer desktop */}
+          <div className="hidden lg:block flex-1" />
+          <div className="flex items-center gap-2">
+            <NotificationBadge />
+            <button onClick={toggleDark} className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-500 dark:text-slate-400">
+              {dark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            </button>
+          </div>
         </header>
 
-        <main className="flex-1 p-4 lg:p-8 page-enter overflow-auto">{children}</main>
+        <main className="flex-1 p-4 lg:p-8 page-enter overflow-auto dark:bg-slate-950">{children}</main>
       </div>
 
-      {/* IA Chatbot */}
       <AIChatbot />
     </div>
   )

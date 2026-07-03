@@ -8,10 +8,10 @@ const MODEL = 'llama-3.3-70b-versatile'
 
 const SYSTEM_PROMPT = `Tu es PaieBot, assistant IA expert en paie et droit du travail au Togo.
 Tu maîtrises parfaitement :
-- Code Général des Impôts OTR 2025 (ITS, Art. 26 abattement 28%, Art. 73 charges famille 10 000F/pers/mois, Art. 74 barème annuel)
-- Code du Travail Togo 2021 (licenciement Art. 97 : 35%/40%/45%, préavis, SMIG, heures supp)
+- Code Général des Impôts OTR 2025 (IRPP, abattement 28%, charges famille 10 000F/pers/mois)
+- Code du Travail Togo 2021 (licenciement, préavis, SMIG, heures supp)
 - CNSS : 4% salarié, 17,5% employeur
-- INAM : 5% salarié, 5% employeur
+- AMU : 5% salarié, 5% employeur
 - Calcul bulletins de paie, indemnités, grilles salariales
 Réponds en français, sois concis et pratique. Fournis des exemples chiffrés quand utile.
 Si on te demande un calcul de paie, calcule-le étape par étape.`
@@ -20,7 +20,7 @@ export function AIChatbot() {
   const [open, setOpen] = useState(false)
   const [minimized, setMinimized] = useState(false)
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', content: '👋 Bonjour ! Je suis **PaieBot**, votre assistant paie Togo.\n\nJe peux vous aider avec :\n- 📊 Calculs de paie (ITS, CNSS, INAM)\n- 📋 Questions CGI OTR 2025\n- ⚖️ Code du Travail 2021\n- 💰 Indemnités et primes\n\nQue puis-je faire pour vous ?', ts: Date.now() }
+    { role: 'assistant', content: '👋 Bonjour ! Je suis **PaieBot**, votre assistant paie Togo.\n\nJe peux vous aider avec :\n- 📊 Calculs de paie (IRPP, CNSS, AMU)\n- 📋 Questions CGI OTR 2025\n- ⚖️ Code du Travail 2021\n- 💰 Indemnités et primes\n\nQue puis-je faire pour vous ?', ts: Date.now() }
   ])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -175,7 +175,7 @@ export function AIChatbot() {
 
           {/* Suggestions rapides */}
           <div className="px-4 pb-2 flex gap-2 overflow-x-auto">
-            {['Calcul ITS', 'SMIG 2025', 'Indemnité licenciement', 'Heures supp'].map(s => (
+            {['Calcul IRPP', 'SMIG 2025', 'Indemnité licenciement', 'Heures supp'].map(s => (
               <button key={s} onClick={() => { setInput(s); inputRef.current?.focus() }}
                 className="text-xs bg-slate-50 hover:bg-primary-50 hover:text-primary-700 border border-slate-200 hover:border-primary-200 text-slate-600 px-3 py-1.5 rounded-full whitespace-nowrap transition-all duration-200 flex-shrink-0">
                 {s}

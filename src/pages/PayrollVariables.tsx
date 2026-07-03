@@ -3,8 +3,9 @@ import { useParams, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { calculatePayroll, formatXOF, MONTH_NAMES, PayrollInput, PayrollResult } from '../lib/payroll'
-import { generateBulletinPDF } from '../lib/pdf'
-import { ArrowLeft, Calculator, FileText, Save, Lock, Loader2, Search, Info } from 'lucide-react'
+import { generateBulletinPDF, uploadBulletinToStorage } from '../lib/pdf'
+import { sendBulletinEmail } from '../lib/email'
+import { ArrowLeft, Calculator, FileText, Save, Lock, Loader2, Search, Info, Upload, Mail, CheckCircle2 } from 'lucide-react'
 
 interface Employee {
   id: string; first_name: string; last_name: string; matricule: string | null
@@ -17,9 +18,9 @@ interface PayrollVariable {
   communication_allowance: number; housing_premium: number; meal_premium: number
   transport_allowance: number; salary_advance: number; loan_payment: number
   flat_deduction: number; gross_salary: number; cnss_employee: number
-  inam_employee: number; its_brut: number; ricf: number; its_net: number
+  amu_employee: number; irpp_brut: number; ricf: number; irpp_net: number
   total_deductions: number; net_payable: number; cnss_employer: number
-  inam_employer: number; status: string
+  amu_employer: number; status: string
 }
 
 const EMPTY_VARS = {
@@ -42,6 +43,10 @@ export default function PayrollVariables() {
   const [search, setSearch] = useState('')
   const [saving, setSaving] = useState(false)
   const [calculating, setCalculating] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [emailing, setEmailing] = useState(false)
+  const [uploadedUrl, setUploadedUrl] = useState<string | null>(null)
+  const [emailSuccess, setEmailSuccess] = useState(false)
 
   useEffect(() => { if (periodId) fetchData() }, [periodId])
 
@@ -126,11 +131,38 @@ export default function PayrollVariables() {
     setSaving(false)
   }
 
-  const handleGeneratePDF = () => {
+  const handleGeneratePDF = async () => {
     if (!selectedEmpId || !result || !period) return
     const emp = employees.find((e) => e.id === selectedEmpId)
     if (!emp) return
-    generateBulletinPDF({ employee: emp, period, variables: form, result, orgName: org?.name || '' })
+    await generateBulletinPDF({ employee: emp, period, variables: form, result, orgName: org?.name || '' })
+  }
+
+  const handleArchivePDF = async () => {
+    if (!selectedEmpId || !result || !period || !org) return
+    const emp = employees.find((e) => e.id === selectedEmpId)
+    if (!emp) return
+    setUploading(true)
+    const doc = await generateBulletinPDF({ employee: emp, period, variables: form, result, orgName: org.name || '', returnDoc: true })
+    const periodLabel = `${MONTH_NAMES[period.period_month - 1]}-${period.period_year}`
+    const { url, error } = await uploadBulletinToStorage(doc, emp.id, periodLabel, org.id)
+    setUploading(false)
+    if (url) setUploadedUrl(url)
+    else alert('Erreur archivage : ' + error)
+  }
+
+  const handleSendEmail = async () => {
+    if (!selectedEmpId || !result || !period || !org) return
+    const emp = employees.find((e) => e.id === selectedEmpId)
+    if (!emp || !(emp as any).email) { alert('Email employé manquant.'); return }
+    setEmailing(true)
+    const doc = await generateBulletinPDF({ employee: emp, period, variables: form, result, orgName: org.name || '', returnDoc: true })
+    const pdfBase64 = doc.output('datauristring').split(',')[1]
+    const periodLabel = `${MONTH_NAMES[period.period_month - 1]} ${period.period_year}`
+    const { success, error } = await sendBulletinEmail({ to: (emp as any).email, employeeName: `${emp.first_name} ${emp.last_name}`, period: periodLabel, pdfBase64, cabinetName: org.name || 'Cabinet' })
+    setEmailing(false)
+    if (success) setEmailSuccess(true)
+    else alert('Erreur envoi : ' + error)
   }
 
   const handleClosePeriod = async () => {
@@ -267,7 +299,20 @@ export default function PayrollVariables() {
                   <button onClick={handleGeneratePDF} disabled={!result || isClosed} className="btn-ghost text-primary-600 hover:bg-primary-50">
                     <FileText className="w-4 h-4" /> Bulletin PDF
                   </button>
+                  <button onClick={handleArchivePDF} disabled={!result || isClosed || uploading} className="btn-ghost text-violet-600 hover:bg-violet-50">
+                    {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                    Archiver
+                  </button>
+                  <button onClick={handleSendEmail} disabled={!result || isClosed || emailing} className="btn-ghost text-emerald-600 hover:bg-emerald-50">
+                    {emailing ? <Loader2 className="w-4 h-4 animate-spin" /> : emailSuccess ? <CheckCircle2 className="w-4 h-4" /> : <Mail className="w-4 h-4" />}
+                    {emailSuccess ? 'Envoyé !' : 'Email'}
+                  </button>
                 </div>
+                {uploadedUrl && (
+                  <p className="text-xs text-violet-600 mt-2">
+                    Archivé · <a href={uploadedUrl} target="_blank" rel="noreferrer" className="underline">Voir le PDF</a>
+                  </p>
+                )}
               </div>
 
               {/* Résultats */}
@@ -276,17 +321,17 @@ export default function PayrollVariables() {
                   <div className="flex items-center gap-2 mb-4">
                     <h3 className="font-semibold text-slate-900">Résultats du calcul</h3>
                     <span className="text-xs text-slate-400 flex items-center gap-1">
-                      <Info className="w-3 h-3" /> CGI OTR 2025 — Art. 26, 73, 74
+                      <Info className="w-3 h-3" /> CGI OTR 2025 — 
                     </span>
                   </div>
                   <div className="space-y-1">
                     <ResultRow label="Salaire brut" value={result.gross_salary} />
                     <ResultRow label="CNSS salarié (4%)" value={-result.cnss_employee} negative />
-                    <ResultRow label="INAM salarié (5%)" value={-result.inam_employee} negative />
-                    <ResultRow label="Abattement 28% (Art. 26)" value={-result.abattement_28} negative muted />
+                    <ResultRow label="AMU salarié (5%)" value={-result.amu_employee} negative />
+                    <ResultRow label="Abattement 28%" value={-result.abattement_28} negative muted />
                     <ResultRow label="Déduction charges famille" value={-result.charges_famille} negative muted />
                     <ResultRow label="Revenu imposable mensuel" value={result.taxable_income_monthly} muted />
-                    <ResultRow label="ITS mensuel" value={-result.its_net} negative />
+                    <ResultRow label="IRPP mensuel" value={-result.irpp_net} negative />
                     {form.salary_advance > 0 && <ResultRow label="Avance sur salaire" value={-form.salary_advance} negative />}
                     {form.loan_payment > 0 && <ResultRow label="Remboursement prêt" value={-form.loan_payment} negative />}
                     <div className="border-t border-slate-200 pt-2 mt-2">
@@ -297,13 +342,13 @@ export default function PayrollVariables() {
                     <p className="text-xs font-semibold text-slate-500 uppercase mb-2">Charges patronales</p>
                     <div className="space-y-1">
                       <ResultRow label="CNSS employeur (17,5%)" value={result.cnss_employer} muted />
-                      <ResultRow label="INAM employeur (5%)" value={result.inam_employer} muted />
+                      <ResultRow label="AMU employeur (5%)" value={result.amu_employer} muted />
                       <ResultRow label="Total charges patronales" value={result.employer_total} bold />
                     </div>
                   </div>
                   <div className="mt-4 pt-4 border-t border-slate-100 text-xs text-slate-400">
                     Revenu imposable annuel : {formatXOF(result.taxable_income_annual)} | 
-                    ITS annuel : {formatXOF(result.its_net * 12)}
+                    IRPP annuel : {formatXOF(result.irpp_net * 12)}
                   </div>
                 </div>
               )}

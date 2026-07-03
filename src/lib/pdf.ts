@@ -73,7 +73,7 @@ export async function generateBulletinPDF(data: BulletinData): Promise<jsPDF> {
   doc.setFillColor(...HEADER_BG)
   doc.setDrawColor(140, 140, 140); doc.setLineWidth(0.3)
   doc.rect(ml, y, mr - ml, 14, 'FD')
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(...BLACK)
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(...BLACK)
   const entiteName = client.entite_name || client.name || orgName
   doc.text(`Entité: ${entiteName}`, (pw) / 2, y + 5.5, { align: 'center' })
   doc.setFont('helvetica', 'normal'); doc.setFontSize(8)
@@ -84,7 +84,7 @@ export async function generateBulletinPDF(data: BulletinData): Promise<jsPDF> {
   // ── Bloc N° Employeur / NIF / TEL ─────────────────────────────────────────
   doc.setFillColor(...HEADER_BG2)
   doc.rect(ml, y, mr - ml, 12, 'FD')
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5)
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(10.5)
   const empLine = `N° Employeur : ${client.num_employeur || '—'}     NIF :  ${client.nif || client.ifu || '—'}`
   doc.text(empLine, pw / 2, y + 5, { align: 'center' })
   doc.setFontSize(8.5)
@@ -143,20 +143,21 @@ export async function generateBulletinPDF(data: BulletinData): Promise<jsPDF> {
   ]
 
   const rowH = 5.2
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5)
+  doc.setFontSize(8.5)
   for (const row of rubriqueRows) {
     doc.rect(ml, y, mr - ml, rowH)
     if (row.label) {
-      doc.setTextColor(...BLACK)
-      doc.text(row.label, COL.rub + 2, y + 3.8)
-      if (row.base > 0) doc.text(num(row.base), COL.base + 8, y + 3.8, { align: 'right' })
-      doc.text('30', COL.taux + 12, y + 3.8, { align: 'right' })
-      if (row.gains > 0) doc.text(num(row.gains), mr - 2, y + 3.8, { align: 'right' })
-      else { doc.text('0', mr - 2, y + 3.8, { align: 'right' }) }
+      doc.setFont('helvetica', 'bold'); doc.setTextColor(...BLACK)
+      doc.text(row.label, COL.rub + 2, y + 3.5)
+      doc.setFont('helvetica', 'normal')
+      if (row.base > 0) doc.text(num(row.base), COL.base + 8, y + 3.5, { align: 'right' })
+      doc.text('30', COL.taux + 12, y + 3.5, { align: 'right' })
+      if (row.gains > 0) doc.text(num(row.gains), mr - 2, y + 3.5, { align: 'right' })
+      else doc.text('0', mr - 2, y + 3.5, { align: 'right' })
     } else {
-      doc.text('', COL.rub + 2, y + 3.8)
-      doc.text('30', COL.taux + 12, y + 3.8, { align: 'right' })
-      doc.text('0', mr - 2, y + 3.8, { align: 'right' })
+      doc.setFont('helvetica', 'normal')
+      doc.text('30', COL.taux + 12, y + 3.5, { align: 'right' })
+      doc.text('0', mr - 2, y + 3.5, { align: 'right' })
     }
     y += rowH
   }
@@ -175,13 +176,14 @@ export async function generateBulletinPDF(data: BulletinData): Promise<jsPDF> {
     { label: 'AMU', base: result.gross_salary, taux: '0,05', retenue: result.amu_employee },
     { label: 'IRPP', base: result.taxable_income_monthly, taux: '', retenue: result.irpp_net },
   ]
-  doc.setFont('helvetica', 'normal'); doc.setTextColor(...BLACK)
+  doc.setTextColor(...BLACK)
   for (const row of retRows) {
     doc.rect(ml, y, mr - ml, rowH, 'D')
-    doc.text(row.label, COL.rub + 2, y + 3.8)
-    doc.text(num(row.base), COL.base + 8, y + 3.8, { align: 'right' })
-    if (row.taux) doc.text(row.taux, COL.taux + 12, y + 3.8, { align: 'right' })
-    doc.text(num(row.retenue), COL.ret + 14, y + 3.8, { align: 'right' })
+    doc.setFont('helvetica', 'bold'); doc.text(row.label, COL.rub + 2, y + 3.5)
+    doc.setFont('helvetica', 'normal')
+    doc.text(num(row.base), COL.base + 8, y + 3.5, { align: 'right' })
+    if (row.taux) doc.text(row.taux, COL.taux + 12, y + 3.5, { align: 'right' })
+    doc.text(num(row.retenue), COL.ret + 14, y + 3.5, { align: 'right' })
     y += rowH
   }
 

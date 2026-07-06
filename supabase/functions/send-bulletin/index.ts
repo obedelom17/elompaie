@@ -2,15 +2,14 @@ import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY') ?? ''
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-}
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
+    return new Response(null, {
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'authorization, content-type',
+      },
+    })
   }
 
   try {
@@ -44,11 +43,11 @@ serve(async (req) => {
     })
 
     const data = await res.json()
-    if (!res.ok) return new Response(JSON.stringify({ error: data }), { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders } })
+    if (!res.ok) return new Response(JSON.stringify({ error: data }), { status: 400 })
     return new Response(JSON.stringify({ success: true, id: data.id }), {
-      headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
     })
   } catch (e) {
-    return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } })
+    return new Response(JSON.stringify({ error: String(e) }), { status: 500 })
   }
 })

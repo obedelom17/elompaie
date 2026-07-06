@@ -194,7 +194,7 @@ export const MONTH_NAMES = [
 // En l'absence de convention: +25% standard, +50% nuit/dimanche, +100% dimanche/férié de nuit
 // (pratique courante Togo en l'absence de convention collective applicable)
 export const OT_RATES_LABEL = {
-  h1: '+15% (heures supp. jour 41-48h)',
+  h1: '+25% (heures supp. jour)',
   h2: '+50% (nuit ou dimanche)',
   h3: '+100% (nuit dimanche/férié)',
 }

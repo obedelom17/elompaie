@@ -5,7 +5,7 @@ import { Download, FileText, FileSpreadsheet, Filter, Loader2, Building2, Trendi
 import { MONTH_NAMES, formatXOF } from '../lib/payroll'
 import { generateBulletinPDF } from '../lib/pdf'
 
-interface Period { id: string; client_id: string; period_month: number; period_year: number; status: string; clients?: { name: string } | null }
+interface Period { id: string; period_month: number; period_year: number; status: string; clients?: { name: string } | null }
 interface Client { id: string; name: string }
 
 export default function ExportReports() {
@@ -29,7 +29,7 @@ export default function ExportReports() {
     setLoading(false)
   }
 
-  const filteredPeriods = periods.filter(p => filterClient === 'all' || p.client_id === filterClient)
+  const filteredPeriods = periods.filter(p => filterClient === 'all' || p.clients?.name === clients.find(c => c.id === filterClient)?.name)
 
   // Export masse salariale CSV
   const exportCSV = async (periodId: string, periodLabel: string) => {
@@ -85,6 +85,10 @@ export default function ExportReports() {
       .eq('status', 'calculated')
 
     if (!vars?.length) { setExporting(null); alert('Aucun bulletin calculé.'); return }
+
+    // Import dynamique jsPDF pour éviter re-render
+    const { default: jsPDF } = await import('jspdf')
+    const { default: autoTable } = await import('jspdf-autotable')
 
     for (const v of vars) {
       const emp = v.employees

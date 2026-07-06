@@ -194,42 +194,37 @@ export async function generateBulletinPDF(data: BulletinData): Promise<jsPDF> {
   doc.text(num(result.total_deductions), COL.ret + 14, y + 3.8, { align: 'right' })
   y += rowH
 
-  // Salaire Net légal (avant avance/prêt)
-  const salaireLegal = result.gross_salary - result.cnss_employee - result.amu_employee - result.irpp_net
+  // Salaire Net
   doc.rect(ml, y, mr - ml, rowH, 'D')
   doc.setFont('times', 'bold')
   doc.text('Salaire Net ', COL.rub + 2, y + 3.8)
   doc.setFont('times', 'normal'); doc.text('(après Retenues Légales)', COL.rub + 22, y + 3.8)
   doc.setFont('times', 'bold')
-  doc.text(num(salaireLegal), mr - 2, y + 3.8, { align: 'right' })
+  doc.text(num(result.net_payable), mr - 2, y + 3.8, { align: 'right' })
   y += rowH
 
   // Retenue avance
   const advance = variables.salary_advance || 0
-  if (advance > 0) {
-    doc.rect(ml, y, mr - ml, rowH, 'D')
-    doc.setFont('times', 'normal')
-    doc.text('Retenue avance sur salaire', COL.rub + 2, y + 3.8)
-    doc.text(num(advance), COL.ret + 14, y + 3.8, { align: 'right' })
-    y += rowH
-  }
+  doc.rect(ml, y, mr - ml, rowH, 'D')
+  doc.setFont('times', 'normal')
+  doc.text('Retenue avance sur salaire', COL.rub + 2, y + 3.8)
+  doc.text(num(advance), COL.ret + 14, y + 3.8, { align: 'right' })
+  y += rowH
 
-  // Remboursement prêt
-  const loan = variables.loan_payment || 0
-  if (loan > 0) {
-    doc.rect(ml, y, mr - ml, rowH, 'D')
-    doc.setFont('times', 'normal')
-    doc.text('Remboursement prêt', COL.rub + 2, y + 3.8)
-    doc.text(num(loan), COL.ret + 14, y + 3.8, { align: 'right' })
-    y += rowH
-  }
+  // Total autres retenues
+  const otherRet = (variables.loan_payment || 0) + advance
+  doc.rect(ml, y, mr - ml, rowH, 'D')
+  doc.setFont('times', 'bold')
+  doc.text('Total Autres retenues', COL.rub + 2, y + 3.8)
+  doc.text(num(otherRet - advance), COL.ret + 14, y + 3.8, { align: 'right' })
+  y += rowH
 
   // NET A PAYER (fond gris foncé)
   doc.setFillColor(200, 200, 200)
   doc.rect(ml, y, mr - ml, rowH + 1, 'FD')
   doc.setFont('times', 'bold'); doc.setFontSize(10); doc.setTextColor(...BLACK)
   doc.text('NET A PAYER', (ml + mr) / 2, y + 4.5, { align: 'center' })
-  doc.text(num(result.net_payable), mr - 2, y + 4.5, { align: 'right' })
+  doc.text(num(result.net_payable - (otherRet - advance)), mr - 2, y + 4.5, { align: 'right' })
   y += rowH + 1 + 6
 
   // ── Signatures + Charges patronales ───────────────────────────────────────

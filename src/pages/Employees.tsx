@@ -16,7 +16,6 @@ interface Employee {
   marital_status: string; children_count: number; active: boolean
   status: EmployeeStatus; contract_type: ContractType; contract_end_date: string | null
   client_id: string; hire_date: string | null; birth_date: string | null
-  email: string | null; phone: string | null; social_security_number: string | null
   clients?: { name: string } | null
 }
 interface Client { id: string; name: string }
@@ -85,8 +84,8 @@ export default function Employees() {
       gender: emp.gender || 'M', birth_date: emp.birth_date || '',
       hire_date: emp.hire_date || '', position: emp.position || '',
       category: emp.category || '', marital_status: emp.marital_status,
-      children_count: emp.children_count, social_security_number: emp.social_security_number || '',
-      phone: emp.phone || '', email: emp.email || '', active: emp.active,
+      children_count: emp.children_count, social_security_number: '',
+      phone: '', email: '', active: emp.active,
       status: emp.status || 'actif',
       contract_type: emp.contract_type || 'cdi',
       contract_end_date: emp.contract_end_date || '',
@@ -103,9 +102,6 @@ export default function Employees() {
       hire_date: form.hire_date || null,
       contract_end_date: form.contract_type !== 'cdi' && form.contract_end_date ? form.contract_end_date : null,
       active: form.status === 'actif',
-      email: form.email || null,
-      phone: form.phone || null,
-      social_security_number: form.social_security_number || null,
     }
     if (editing) {
       await supabase.from('employees').update(payload).eq('id', editing.id)
@@ -385,11 +381,6 @@ export default function Employees() {
                 </div>
                 <div><label className="label">Enfants à charge</label><input type="number" min="0" max="6" value={form.children_count} onChange={e => setForm({...form, children_count: Number(e.target.value)})} className="input" /></div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div><label className="label">Email</label><input type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} className="input" placeholder="prenom.nom@email.com" /></div>
-                <div><label className="label">Téléphone</label><input type="tel" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} className="input" placeholder="+228 xx xx xx xx" /></div>
-              </div>
-              <div><label className="label">N° Sécurité sociale</label><input value={form.social_security_number} onChange={e => setForm({...form, social_security_number: e.target.value})} className="input max-w-xs" /></div>
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setShowForm(false)} className="btn-secondary flex-1">Annuler</button>
                 <button type="submit" className="btn-primary flex-1">{editing ? 'Mettre à jour' : 'Créer'}</button>

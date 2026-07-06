@@ -16,6 +16,7 @@ interface Employee {
   marital_status: string; children_count: number; active: boolean
   status: EmployeeStatus; contract_type: ContractType; contract_end_date: string | null
   client_id: string; hire_date: string | null; birth_date: string | null
+  email: string | null; phone: string | null; social_security_number: string | null
   clients?: { name: string } | null
 }
 interface Client { id: string; name: string }
@@ -84,8 +85,8 @@ export default function Employees() {
       gender: emp.gender || 'M', birth_date: emp.birth_date || '',
       hire_date: emp.hire_date || '', position: emp.position || '',
       category: emp.category || '', marital_status: emp.marital_status,
-      children_count: emp.children_count, social_security_number: '',
-      phone: '', email: '', active: emp.active,
+      children_count: emp.children_count, social_security_number: emp.social_security_number || '',
+      phone: emp.phone || '', email: emp.email || '', active: emp.active,
       status: emp.status || 'actif',
       contract_type: emp.contract_type || 'cdi',
       contract_end_date: emp.contract_end_date || '',
@@ -102,6 +103,9 @@ export default function Employees() {
       hire_date: form.hire_date || null,
       contract_end_date: form.contract_type !== 'cdi' && form.contract_end_date ? form.contract_end_date : null,
       active: form.status === 'actif',
+      email: form.email || null,
+      phone: form.phone || null,
+      social_security_number: form.social_security_number || null,
     }
     if (editing) {
       await supabase.from('employees').update(payload).eq('id', editing.id)
@@ -320,7 +324,7 @@ export default function Employees() {
               <h2 className="font-bold text-slate-900">{editing ? "Modifier l'employé" : 'Nouvel employé'}</h2>
               <button onClick={() => setShowForm(false)} className="p-1.5 rounded-xl hover:bg-slate-100"><X className="w-5 h-5 text-slate-400" /></button>
             </div>
-            <form onSubmit={handleSubmit} className="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
+            <form onSubmit={handleSubmit} className="p-6 space-y-5 max-h-[85vh] overflow-y-auto">
               <div><label className="label">Client *</label>
                 <select required value={form.client_id} onChange={e => setForm({...form, client_id: e.target.value})} className="input">
                   {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}

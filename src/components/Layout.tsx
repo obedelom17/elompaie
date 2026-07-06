@@ -4,11 +4,10 @@ import { useAuth } from '../context/AuthContext'
 import {
   LayoutDashboard, Building2, Users, Grid3x3, CalendarClock,
   LogOut, Menu, Calculator, Download, FlaskConical, X, ChevronRight,
-  Activity, Sun, Moon
+  Activity, Moon
 } from 'lucide-react'
 import { AIChatbot } from './AIChatbot'
 import { NotificationBadge } from './NotificationBadge'
-import { useDarkMode } from '../hooks/useDarkMode'
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts'
 
 const navItems = [
@@ -26,13 +25,12 @@ export default function Layout({ children }: { children: ReactNode }) {
   const { org, signOut } = useAuth()
   const navigate = useNavigate()
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const { dark, toggle: toggleDark } = useDarkMode()
   useKeyboardShortcuts()
 
   const handleSignOut = async () => { await signOut(); navigate('/auth') }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex">
+    <div className="min-h-screen bg-slate-50 flex">
       {sidebarOpen && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-30 lg:hidden animate-fade-in"
           onClick={() => setSidebarOpen(false)} />
@@ -100,27 +98,24 @@ export default function Layout({ children }: { children: ReactNode }) {
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="sticky top-0 z-20 bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm border-b border-slate-200 dark:border-slate-800 px-4 py-3 flex items-center justify-between">
-          <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
-            <Menu className="w-5 h-5 text-slate-700 dark:text-slate-300" />
+        <header className="sticky top-0 z-20 bg-white/90 backdrop-blur-sm border-b border-slate-200 px-4 py-3 flex items-center justify-between">
+          <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-2 rounded-xl hover:bg-slate-100 transition-colors">
+            <Menu className="w-5 h-5 text-slate-700" />
           </button>
           <div className="lg:hidden flex items-center gap-2">
             <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center">
               <Calculator className="w-4 h-4 text-white" />
             </div>
-            <span className="font-black text-slate-900 dark:text-white">ObedPaie</span>
+            <span className="font-black text-slate-900">ObedPaie</span>
           </div>
           {/* Spacer desktop */}
           <div className="hidden lg:block flex-1" />
           <div className="flex items-center gap-2">
             <NotificationBadge />
-            <button onClick={toggleDark} className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-500 dark:text-slate-400">
-              {dark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-            </button>
           </div>
         </header>
 
-        <main className="flex-1 p-4 lg:p-8 page-enter overflow-auto dark:bg-slate-950">{children}</main>
+        <main className="flex-1 p-4 lg:p-8 page-enter overflow-auto">{children}</main>
       </div>
 
       <AIChatbot />

@@ -3,7 +3,6 @@ import { useParams, Link } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { ArrowLeft, User, CalendarClock, FileText, AlertTriangle, TrendingUp } from 'lucide-react'
 import { SalaryHistoryChart } from '../components/SalaryHistoryChart'
-import { SalaryHistoryChart } from '../components/SalaryHistoryChart'
 import { MONTH_NAMES, formatXOF, calculateSeverancePay, calcAnciennete, calcIndemniteMaladie, calcIndemniteCongésNonPris, calcIndemniteMaterniteMensuelle } from '../lib/payroll'
 
 type EmployeeStatus = 'actif' | 'suspendu' | 'retraite' | 'decede'
@@ -93,6 +92,9 @@ export default function EmployeeDetail() {
               <div><span className="text-slate-500">Ancienneté:</span> <span className="font-medium">{anc.label}</span></div>
               <div><span className="text-slate-500">Contrat:</span> <span className="font-medium uppercase">{employee.contract_type || 'CDI'}</span></div>
               {employee.contract_end_date && <div><span className="text-slate-500">Fin contrat:</span> <span className="font-medium">{new Date(employee.contract_end_date).toLocaleDateString('fr-FR')}</span></div>}
+              {employee.email && <div><span className="text-slate-500">Email:</span> <a href={`mailto:${employee.email}`} className="font-medium text-primary-600 hover:underline">{employee.email}</a></div>}
+              {employee.phone && <div><span className="text-slate-500">Téléphone:</span> <span className="font-medium">{employee.phone}</span></div>}
+              {employee.social_security_number && <div><span className="text-slate-500">N° SS:</span> <span className="font-medium">{employee.social_security_number}</span></div>}
             </div>
           </div>
           <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${STATUS_COLORS[status]}`}>{STATUS_LABELS[status]}</span>

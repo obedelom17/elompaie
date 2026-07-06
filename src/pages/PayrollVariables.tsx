@@ -10,7 +10,9 @@ import { ArrowLeft, Calculator, FileText, Save, Lock, Loader2, Search, Info, Upl
 interface Employee {
   id: string; first_name: string; last_name: string; matricule: string | null
   position: string | null; category: string | null; marital_status: string
-  children_count: number; client_id: string; clients?: { name: string } | null
+  children_count: number; client_id: string; email: string | null; phone: string | null
+  social_security_number: string | null; hire_date: string | null
+  clients?: { name: string } | null
 }
 interface PayrollVariable {
   id: string; employee_id: string; period_id: string; base_salary: number
@@ -66,6 +68,8 @@ export default function PayrollVariables() {
 
   const selectEmployee = (emp: Employee) => {
     setSelectedEmpId(emp.id)
+    setEmailSuccess(false)
+    setUploadedUrl(null)
     const existing = variables.get(emp.id)
     if (existing) {
       setForm({
@@ -154,12 +158,12 @@ export default function PayrollVariables() {
   const handleSendEmail = async () => {
     if (!selectedEmpId || !result || !period || !org) return
     const emp = employees.find((e) => e.id === selectedEmpId)
-    if (!emp || !(emp as any).email) { alert('Email employé manquant.'); return }
+    if (!emp || !emp.email) { alert("Cet employé n'a pas d'adresse email. Modifiez sa fiche d'abord."); return }
     setEmailing(true)
     const doc = await generateBulletinPDF({ employee: emp, period, variables: form, result, orgName: org.name || '', returnDoc: true })
     const pdfBase64 = doc.output('datauristring').split(',')[1]
     const periodLabel = `${MONTH_NAMES[period.period_month - 1]} ${period.period_year}`
-    const { success, error } = await sendBulletinEmail({ to: (emp as any).email, employeeName: `${emp.first_name} ${emp.last_name}`, period: periodLabel, pdfBase64, cabinetName: org.name || 'Cabinet' })
+    const { success, error } = await sendBulletinEmail({ to: emp.email!, employeeName: `${emp.first_name} ${emp.last_name}`, period: periodLabel, pdfBase64, cabinetName: org.name || 'Cabinet' })
     setEmailing(false)
     if (success) setEmailSuccess(true)
     else alert('Erreur envoi : ' + error)

@@ -53,7 +53,7 @@ export default function AuthPage() {
           <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center mx-auto mb-8 shadow-glow-primary animate-float">
             <Calculator className="w-10 h-10 text-white" />
           </div>
-          <h2 className="text-4xl font-bold text-white mb-4 tracking-tight">ObedPaie</h2>
+          <h2 className="text-4xl font-bold text-white mb-4 tracking-tight">ElomPaie</h2>
           <p className="text-white/60 text-lg mb-10 max-w-sm">Gestion de paie multi-client pour cabinets comptables au Togo</p>
           <div className="space-y-3">
             {['Calcul IRPP · Barème CGI OTR 2025', 'CNSS 4% · AMU 5% automatique', 'Bulletins de paie PDF en 1 clic', 'Multi-clients · Multi-employés'].map((f, i) => (
@@ -75,7 +75,7 @@ export default function AuthPage() {
             <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center mx-auto mb-3 shadow-glow-primary">
               <Calculator className="w-7 h-7 text-white" />
             </div>
-            <h1 className="text-2xl font-bold text-white">ObedPaie</h1>
+            <h1 className="text-2xl font-bold text-white">ElomPaie</h1>
           </div>
 
           <div className="bg-white/95 backdrop-blur-sm rounded-3xl shadow-modal p-8 animate-scale-in">

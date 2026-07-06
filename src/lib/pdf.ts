@@ -263,7 +263,7 @@ export async function generateBulletinPDF(data: BulletinData): Promise<jsPDF> {
 
   // Pied de page
   doc.setFont('times', 'italic'); doc.setFontSize(7); doc.setTextColor(140, 140, 140)
-  doc.text(`Édité le ${new Date().toLocaleDateString('fr-FR')} par ObedPaie · CGI OTR 2025`, pw / 2, ph - 8, { align: 'center' })
+  doc.text(`Édité le ${new Date().toLocaleDateString('fr-FR')} par ElomPaie · CGI OTR 2025`, pw / 2, ph - 8, { align: 'center' })
 
   if (!returnDoc) {
     doc.save(`bulletin_${employee.last_name}_${monthName}_${period.period_year}.pdf`)

@@ -96,7 +96,7 @@ export default function Dashboard() {
               <Rocket className="w-6 h-6 text-primary-600" />
             </div>
             <div className="flex-1">
-              <h3 className="font-bold text-slate-900">Bienvenue sur ObedPaie !</h3>
+              <h3 className="font-bold text-slate-900">Bienvenue sur ElomPaie !</h3>
               <p className="text-sm text-slate-500 mt-0.5">Commencez par créer un client, ajouter un employé, puis ouvrir une période de paie.</p>
             </div>
             <button onClick={() => setShowOnboarding(true)} className="btn-primary">

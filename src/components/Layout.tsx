@@ -45,7 +45,7 @@ export default function Layout({ children }: { children: ReactNode }) {
               <Calculator className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h1 className="text-base font-black text-white tracking-tight">ObedPaie</h1>
+              <h1 className="text-base font-black text-white tracking-tight">ElomPaie</h1>
               <p className="text-[10px] text-slate-400 font-medium">Gestion de paie · Togo</p>
             </div>
           </div>
@@ -106,7 +106,7 @@ export default function Layout({ children }: { children: ReactNode }) {
             <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center">
               <Calculator className="w-4 h-4 text-white" />
             </div>
-            <span className="font-black text-slate-900">ObedPaie</span>
+            <span className="font-black text-slate-900">ElomPaie</span>
           </div>
           {/* Spacer desktop */}
           <div className="hidden lg:block flex-1" />

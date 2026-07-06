@@ -1,4 +1,4 @@
-# ObedPaie
+# ElomPaie
 
 Logiciel de gestion de paie multi-client pour cabinets comptables au Togo.
 
@@ -25,7 +25,7 @@ Logiciel de gestion de paie multi-client pour cabinets comptables au Togo.
 ```bash
 # 1. Cloner le dépôt
 git clone <repo>
-cd obedpaie
+cd elompaie
 
 # 2. Variables d'environnement Vercel
 VITE_SUPABASE_URL=https://xxx.supabase.co

@@ -71,7 +71,7 @@ export function Onboarding({ onDone }: Props) {
             <p className="text-sm font-semibold text-white/70 uppercase tracking-wide">Démarrage rapide</p>
             <button onClick={onDone} className="p-1.5 rounded-lg hover:bg-white/20 transition-colors"><X className="w-4 h-4" /></button>
           </div>
-          <h2 className="text-2xl font-bold">Configurez ObedPaie</h2>
+          <h2 className="text-2xl font-bold">Configurez ElomPaie</h2>
           <p className="text-white/70 text-sm mt-1">3 étapes pour traiter votre première paie</p>
           {/* Progress */}
           <div className="flex gap-2 mt-5">

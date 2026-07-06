@@ -1,10 +1,10 @@
-# COMPACT — Résumé conversation ObedPaie
+# COMPACT — Résumé conversation ElomPaie
 
 ## Stack
 React 18 + TypeScript + Vite + TailwindCSS + Supabase + jsPDF + Groq API (Llama 3.3 70B)
 
 ## Déployé
-https://obedpaie.vercel.app
+https://elompaie.vercel.app
 
 ## Conformité légale
 - CGI OTR 2025 Art.74 : barème ITS annuel 8 tranches (0% → 35%)

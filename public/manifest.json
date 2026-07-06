@@ -1,6 +1,6 @@
 {
-  "name": "ObedPaie — Gestion de Paie Togo",
-  "short_name": "ObedPaie",
+  "name": "ElomPaie — Gestion de Paie Togo",
+  "short_name": "ElomPaie",
   "description": "Centralisation et pré-calcul de paie multi-client, conforme au CGI OTR 2025 et Code du Travail Togo 2021",
   "start_url": "/",
   "display": "standalone",

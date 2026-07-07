@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { supabase } from '../lib/supabase'
+import { clientsApi, employeesApi, payrollApi } from '../lib/api'
 import { ArrowLeft, Building2, Users, CalendarClock } from 'lucide-react'
 import { MONTH_NAMES } from '../lib/payroll'
 
@@ -14,13 +14,14 @@ export default function ClientDetail() {
   useEffect(() => { if (id) fetchData() }, [id])
 
   const fetchData = async () => {
-    const { data: clientData } = await supabase.from('clients').select('*').eq('id', id).maybeSingle()
-    setClient(clientData)
-    const { data: empData } = await supabase.from('employees').select('*').eq('client_id', id).order('last_name')
-    setEmployees(empData || [])
-    const { data: periodData } = await supabase.from('payroll_periods').select('*').eq('client_id', id).order('period_year', { ascending: false }).order('period_month', { ascending: false })
-    setPeriods(periodData || [])
-    setLoading(false)
+    try {
+      const [c, emps, perds] = await Promise.all([
+        clientsApi.get(id!),
+        employeesApi.list(id),
+        payrollApi.listPeriods(id),
+      ])
+      setClient(c); setEmployees(emps); setPeriods(perds)
+    } catch {} finally { setLoading(false) }
   }
 
   if (loading) return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div></div>

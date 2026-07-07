@@ -1,7 +1,7 @@
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { formatXOF, MONTH_NAMES, PayrollResult } from './payroll'
-import { supabase } from './supabase'
+
 
 interface BulletinData {
   employee: any; period: any; variables: any; result: PayrollResult
@@ -362,15 +362,17 @@ export function generateDeclarationIRPP(periods: any[], variables: any[], orgNam
   doc.save(`declaration_IRPP_T${quarter}_${year}.pdf`)
 }
 
-// Archivage PDF Supabase Storage
-export async function uploadBulletinToStorage(pdfDoc: jsPDF, employeeId: string, periodLabel: string, orgId: string): Promise<{ url: string | null; error: string | null }> {
+// Archivage PDF — Cloudinary via /api/upload-logo
+export async function uploadBulletinToStorage(pdfDoc: jsPDF, employeeId: string, periodLabel: string, _orgId: string): Promise<{ url: string | null; error: string | null }> {
   try {
     const pdfBlob = pdfDoc.output('blob')
-    const filename = `bulletins/${orgId}/${employeeId}/${periodLabel.replace(/\s/g, '-')}.pdf`
-    const { error } = await supabase.storage.from('payroll-pdfs').upload(filename, pdfBlob, { contentType: 'application/pdf', upsert: true })
-    if (error) return { url: null, error: error.message }
-    const { data } = supabase.storage.from('payroll-pdfs').getPublicUrl(filename)
-    return { url: data.publicUrl, error: null }
+    const file = new File([pdfBlob], `${periodLabel.replace(/\s/g, '-')}.pdf`, { type: 'application/pdf' })
+    const token = localStorage.getItem('auth_token')
+    const form = new FormData(); form.append('file', file)
+    const res = await fetch('/api/upload-logo', { method: 'POST', headers: token ? { Authorization: `Bearer ${token}` } : {}, body: form })
+    const data = await res.json()
+    if (!res.ok) return { url: null, error: data.error }
+    return { url: data.url, error: null }
   } catch (e: any) {
     return { url: null, error: e.message }
   }

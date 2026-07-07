@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { supabase } from '../lib/supabase'
-import { useAuth } from '../context/AuthContext'
+import { clientsApi, employeesApi, payrollApi } from '../lib/api'
 import { Building2, Users, CalendarClock, CheckCircle2, ArrowRight, X } from 'lucide-react'
+import { MONTH_NAMES } from '../lib/payroll'
 
 interface Props { onDone: () => void }
 
@@ -12,151 +12,101 @@ const STEPS = [
 ]
 
 export function Onboarding({ onDone }: Props) {
-  const { org } = useAuth()
   const [step, setStep] = useState(1)
-
-  // Étape 1 — Client
   const [clientName, setClientName] = useState('')
   const [clientId, setClientId] = useState<string | null>(null)
-  const [savingClient, setSavingClient] = useState(false)
-
-  // Étape 2 — Employé
   const [empForm, setEmpForm] = useState({ first_name: '', last_name: '', marital_status: 'celibataire', children_count: 0 })
-  const [savingEmp, setSavingEmp] = useState(false)
-
-  // Étape 3 — Période
   const [period, setPeriod] = useState({ year: new Date().getFullYear(), month: new Date().getMonth() + 1 })
-  const [savingPeriod, setSavingPeriod] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string|null>(null)
 
   const handleClient = async () => {
-    if (!clientName.trim() || !org) return
-    setSavingClient(true)
-    const { data } = await supabase.from('clients').insert({ organization_id: org.id, name: clientName.trim() }).select().single()
-    setClientId(data?.id || null)
-    setSavingClient(false)
-    setStep(2)
+    if (!clientName.trim()) return
+    setSaving(true); setError(null)
+    try {
+      const data = await clientsApi.create({ name: clientName.trim() })
+      setClientId(data.id); setStep(2)
+    } catch (e: any) { setError(e.message) }
+    setSaving(false)
   }
 
   const handleEmployee = async () => {
     if (!empForm.first_name || !empForm.last_name || !clientId) return
-    setSavingEmp(true)
-    await supabase.from('employees').insert({
-      client_id: clientId, ...empForm,
-      children_count: Number(empForm.children_count),
-      active: true, status: 'actif', contract_type: 'cdi',
-    })
-    setSavingEmp(false)
-    setStep(3)
+    setSaving(true); setError(null)
+    try {
+      await employeesApi.create({ client_id: clientId, ...empForm, children_count: Number(empForm.children_count), active: true, status: 'actif', contract_type: 'cdi' })
+      setStep(3)
+    } catch (e: any) { setError(e.message) }
+    setSaving(false)
   }
 
   const handlePeriod = async () => {
     if (!clientId) return
-    setSavingPeriod(true)
-    await supabase.from('payroll_periods').insert({
-      client_id: clientId,
-      period_year: period.year,
-      period_month: period.month,
-      status: 'open',
-    })
-    setSavingPeriod(false)
-    onDone()
+    setSaving(true); setError(null)
+    try {
+      await payrollApi.createPeriod({ client_id: clientId, period_year: period.year, period_month: period.month })
+      onDone()
+    } catch (e: any) { setError(e.message) }
+    setSaving(false)
   }
 
   return (
-    <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-scale-in">
-        {/* Header */}
-        <div className="bg-gradient-to-br from-primary-500 to-accent-600 px-8 py-6 text-white">
-          <div className="flex items-center justify-between mb-4">
-            <p className="text-sm font-semibold text-white/70 uppercase tracking-wide">Démarrage rapide</p>
-            <button onClick={onDone} className="p-1.5 rounded-lg hover:bg-white/20 transition-colors"><X className="w-4 h-4" /></button>
-          </div>
-          <h2 className="text-2xl font-bold">Configurez ElomPaie</h2>
-          <p className="text-white/70 text-sm mt-1">3 étapes pour traiter votre première paie</p>
-          {/* Progress */}
-          <div className="flex gap-2 mt-5">
+    <div className="modal-overlay" onClick={onDone}>
+      <div className="modal max-w-lg" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+          <h2 className="font-bold text-slate-900">Démarrage rapide</h2>
+          <button onClick={onDone} className="p-1.5 rounded-xl hover:bg-slate-100"><X className="w-5 h-5 text-slate-400" /></button>
+        </div>
+        <div className="p-6 space-y-6">
+          <div className="flex gap-2">
             {STEPS.map(s => (
-              <div key={s.id} className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${step >= s.id ? 'bg-white' : 'bg-white/30'}`} />
+              <div key={s.id} className={`flex-1 h-1.5 rounded-full transition-colors ${step >= s.id ? 'bg-primary-600' : 'bg-slate-100'}`} />
             ))}
           </div>
-        </div>
-
-        {/* Step indicators */}
-        <div className="flex border-b border-slate-100">
-          {STEPS.map(s => (
-            <div key={s.id} className={`flex-1 flex flex-col items-center py-3 gap-1 text-xs font-medium transition-colors ${step === s.id ? 'text-primary-600' : step > s.id ? 'text-emerald-600' : 'text-slate-300'}`}>
-              {step > s.id ? <CheckCircle2 className="w-4 h-4" /> : <s.icon className="w-4 h-4" />}
-              <span className="hidden sm:block">{s.title}</span>
-            </div>
-          ))}
-        </div>
-
-        {/* Content */}
-        <div className="p-8">
-          {step === 1 && (
-            <div className="space-y-4 animate-fade-in">
-              <div>
-                <h3 className="font-bold text-slate-900 text-lg">{STEPS[0].title}</h3>
-                <p className="text-slate-500 text-sm mt-1">{STEPS[0].sub}</p>
+          <div>
+            {STEPS.map(s => s.id === step && (
+              <div key={s.id} className="page-enter">
+                <div className="w-12 h-12 rounded-2xl bg-primary-100 flex items-center justify-center mb-4"><s.icon className="w-6 h-6 text-primary-600" /></div>
+                <h3 className="text-lg font-bold text-slate-900 mb-1">{s.title}</h3>
+                <p className="text-slate-500 text-sm mb-4">{s.sub}</p>
+                {step === 1 && (
+                  <div className="space-y-3">
+                    <input value={clientName} onChange={e => setClientName(e.target.value)} className="input" placeholder="Nom de l'entreprise" onKeyDown={e => e.key === 'Enter' && handleClient()} autoFocus />
+                  </div>
+                )}
+                {step === 2 && (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <input value={empForm.first_name} onChange={e => setEmpForm({...empForm, first_name: e.target.value})} className="input" placeholder="Prénom" autoFocus />
+                      <input value={empForm.last_name} onChange={e => setEmpForm({...empForm, last_name: e.target.value})} className="input" placeholder="Nom" />
+                    </div>
+                    <select value={empForm.marital_status} onChange={e => setEmpForm({...empForm, marital_status: e.target.value})} className="input">
+                      <option value="celibataire">Célibataire</option>
+                      <option value="marie">Marié(e)</option>
+                    </select>
+                    <div className="flex items-center gap-2"><label className="text-sm text-slate-600">Enfants :</label>
+                      <input type="number" min="0" value={empForm.children_count} onChange={e => setEmpForm({...empForm, children_count: Number(e.target.value)})} className="input w-24" />
+                    </div>
+                  </div>
+                )}
+                {step === 3 && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <select value={period.month} onChange={e => setPeriod({...period, month: Number(e.target.value)})} className="input">
+                      {MONTH_NAMES.map((n, i) => <option key={i} value={i+1}>{n}</option>)}
+                    </select>
+                    <input type="number" value={period.year} onChange={e => setPeriod({...period, year: Number(e.target.value)})} className="input" />
+                  </div>
+                )}
+                {error && <p className="text-sm text-red-600 mt-2">{error}</p>}
               </div>
-              <div>
-                <label className="label">Nom de l'entreprise cliente</label>
-                <input value={clientName} onChange={e => setClientName(e.target.value)} className="input" placeholder="Ex: SARL Togo Import" onKeyDown={e => e.key === 'Enter' && handleClient()} />
-              </div>
-              <button onClick={handleClient} disabled={!clientName.trim() || savingClient} className="btn-primary w-full py-3">
-                {savingClient ? 'Création...' : 'Créer le client'} <ArrowRight className="w-4 h-4" />
-              </button>
-            </div>
-          )}
-
-          {step === 2 && (
-            <div className="space-y-4 animate-fade-in">
-              <div>
-                <h3 className="font-bold text-slate-900 text-lg">{STEPS[1].title}</h3>
-                <p className="text-slate-500 text-sm mt-1">Pour <strong>{clientName}</strong></p>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div><label className="label">Prénom</label><input value={empForm.first_name} onChange={e => setEmpForm({...empForm, first_name: e.target.value})} className="input" placeholder="Kofi" /></div>
-                <div><label className="label">Nom</label><input value={empForm.last_name} onChange={e => setEmpForm({...empForm, last_name: e.target.value})} className="input" placeholder="Mensah" /></div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div><label className="label">Situation</label>
-                  <select value={empForm.marital_status} onChange={e => setEmpForm({...empForm, marital_status: e.target.value})} className="input">
-                    <option value="celibataire">Célibataire</option>
-                    <option value="marie">Marié(e)</option>
-                  </select>
-                </div>
-                <div><label className="label">Enfants</label><input type="number" min="0" max="6" value={empForm.children_count} onChange={e => setEmpForm({...empForm, children_count: Number(e.target.value)})} className="input" /></div>
-              </div>
-              <button onClick={handleEmployee} disabled={!empForm.first_name || !empForm.last_name || savingEmp} className="btn-primary w-full py-3">
-                {savingEmp ? 'Création...' : 'Ajouter l\'employé'} <ArrowRight className="w-4 h-4" />
-              </button>
-            </div>
-          )}
-
-          {step === 3 && (
-            <div className="space-y-4 animate-fade-in">
-              <div>
-                <h3 className="font-bold text-slate-900 text-lg">{STEPS[2].title}</h3>
-                <p className="text-slate-500 text-sm mt-1">Choisissez le mois à traiter</p>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div><label className="label">Mois</label>
-                  <select value={period.month} onChange={e => setPeriod({...period, month: Number(e.target.value)})} className="input">
-                    {['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'].map((m, i) => (
-                      <option key={i} value={i + 1}>{m}</option>
-                    ))}
-                  </select>
-                </div>
-                <div><label className="label">Année</label>
-                  <input type="number" value={period.year} onChange={e => setPeriod({...period, year: Number(e.target.value)})} className="input" min="2020" max="2030" />
-                </div>
-              </div>
-              <button onClick={handlePeriod} disabled={savingPeriod} className="btn-primary w-full py-3">
-                {savingPeriod ? 'Création...' : 'Démarrer la paie 🚀'}
-              </button>
-            </div>
-          )}
+            ))}
+          </div>
+          <div className="flex gap-3">
+            <button onClick={onDone} className="btn-secondary">Plus tard</button>
+            <button onClick={step === 1 ? handleClient : step === 2 ? handleEmployee : handlePeriod} disabled={saving} className="btn-primary flex-1">
+              {saving ? '...' : step < 3 ? <span className="flex items-center gap-2">Suivant <ArrowRight className="w-4 h-4" /></span> : <span className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4" /> Terminer</span>}
+            </button>
+          </div>
         </div>
       </div>
     </div>

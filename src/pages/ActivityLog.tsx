@@ -1,42 +1,28 @@
 import { useEffect, useState } from 'react'
-import { supabase } from '../lib/supabase'
-import { useAuth } from '../context/AuthContext'
-import { Activity, Clock, User } from 'lucide-react'
+import { activityApi } from '../lib/api'
+import { Activity, Clock } from 'lucide-react'
 
-interface LogEntry {
-  id: string; action: string; details: string | null
-  created_at: string; user_id: string
-}
+interface LogEntry { id: string; action: string; details: string | null; created_at: string; user_id: string }
 
 export default function ActivityLog() {
-  const { org } = useAuth()
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => { if (org) fetchLogs() }, [org])
+  useEffect(() => { fetchLogs() }, [])
 
   const fetchLogs = async () => {
-    const { data } = await supabase
-      .from('activity_logs')
-      .select('*')
-      .eq('organization_id', org!.id)
-      .order('created_at', { ascending: false })
-      .limit(100)
-    setLogs(data || [])
-    setLoading(false)
+    try { setLogs(await activityApi.list()) } catch {} finally { setLoading(false) }
   }
 
   const formatDate = (iso: string) => {
     const d = new Date(iso)
-    return d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' }) +
-      ' · ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+    return d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' }) + ' · ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
   }
 
   const actionColor = (action: string) => {
     if (action.includes('créé') || action.includes('import')) return 'bg-emerald-100 text-emerald-700'
     if (action.includes('supprim')) return 'bg-red-100 text-red-700'
     if (action.includes('clôtur') || action.includes('fermé')) return 'bg-blue-100 text-blue-700'
-    if (action.includes('email') || action.includes('envoi')) return 'bg-violet-100 text-violet-700'
     return 'bg-slate-100 text-slate-600'
   }
 

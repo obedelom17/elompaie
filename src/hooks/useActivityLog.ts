@@ -1,18 +1,5 @@
-import { supabase } from '../lib/supabase'
+import { activityApi } from '../lib/api'
 
-export async function logActivity(
-  orgId: string,
-  userId: string,
-  action: string,
-  details?: string
-) {
-  try {
-    await supabase.from('activity_logs').insert({
-      organization_id: orgId,
-      user_id: userId,
-      action,
-      details: details || null,
-      created_at: new Date().toISOString(),
-    })
-  } catch (_) {}
+export async function logActivity(_orgId: string, _userId: string, action: string, details?: string) {
+  try { await activityApi.log(action, details) } catch {}
 }

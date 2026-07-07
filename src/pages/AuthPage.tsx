@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { supabase } from '../lib/supabase'
+import { authApi } from '../lib/api'
 import { Calculator, Mail, Lock, Building2, Loader2, Eye, EyeOff, AlertCircle, CheckCircle, Sparkles, KeyRound } from 'lucide-react'
 
 export default function AuthPage() {
@@ -18,12 +18,11 @@ export default function AuthPage() {
 
   const handleReset = async (e: React.FormEvent) => {
     e.preventDefault(); setError(null); setLoading(true)
-    const { error: err } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth`,
-    })
+    try {
+      await authApi.resetPassword(email)
+      setSuccess('Lien de réinitialisation envoyé. Vérifiez votre boîte mail.')
+    } catch (err: any) { setError(err.message) }
     setLoading(false)
-    if (err) setError(err.message)
-    else setSuccess('Lien de réinitialisation envoyé. Vérifiez votre boîte mail.')
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -32,19 +31,16 @@ export default function AuthPage() {
       if (!orgName.trim()) { setError('Saisissez le nom du cabinet.'); setLoading(false); return }
       if (password.length < 6) { setError('Mot de passe : 6 caractères minimum.'); setLoading(false); return }
       const { error: err } = await signUp(email, password, orgName)
-      if (err) { setError(err); setLoading(false); return }
-      const { error: loginErr } = await signIn(email, password)
-      if (loginErr) { setSuccess('Compte créé ! Connectez-vous.'); setMode('signin') }
+      if (err) setError(err)
     } else {
       const { error: err } = await signIn(email, password)
-      if (err) setError(err.toLowerCase().includes('invalid') ? 'Email ou mot de passe incorrect.' : err)
+      if (err) setError(err.toLowerCase().includes('invalid') || err.toLowerCase().includes('incorrect') ? 'Email ou mot de passe incorrect.' : err)
     }
     setLoading(false)
   }
 
   return (
     <div className="min-h-screen flex" style={{ background: 'linear-gradient(135deg, #0f0f23 0%, #1a1a35 50%, #0f172a 100%)' }}>
-      {/* Left panel */}
       <div className="hidden lg:flex lg:w-1/2 flex-col items-center justify-center p-16 relative overflow-hidden">
         <div className="absolute inset-0 opacity-30" style={{ backgroundImage: 'radial-gradient(circle at 30% 50%, #4f46e5 0%, transparent 60%), radial-gradient(circle at 80% 20%, #a21caf 0%, transparent 40%)' }} />
         <div className="absolute top-20 left-20 w-60 h-60 bg-primary-500/20 rounded-full blur-3xl animate-pulse-soft" />
@@ -68,7 +64,6 @@ export default function AuthPage() {
         </div>
       </div>
 
-      {/* Right form */}
       <div className="flex-1 flex items-center justify-center p-6">
         <div className="w-full max-w-md">
           <div className="lg:hidden text-center mb-8">
@@ -147,14 +142,11 @@ export default function AuthPage() {
                   </div>
                   {mode === 'signup' && <p className="text-xs text-slate-400 mt-1.5">6 caractères minimum</p>}
                 </div>
-
                 {error && <div className="flex items-start gap-2.5 bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3 animate-fade-in"><AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" /><span>{error}</span></div>}
                 {success && <div className="flex items-start gap-2.5 bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm rounded-xl px-4 py-3 animate-fade-in"><CheckCircle className="w-4 h-4 flex-shrink-0 mt-0.5" /><span>{success}</span></div>}
-
                 <button type="submit" disabled={loading} className="btn-primary w-full py-3 text-base mt-2">
                   {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : mode === 'signin' ? 'Se connecter' : 'Créer le compte'}
                 </button>
-
                 {mode === 'signin' && (
                   <button type="button" onClick={() => switchMode('reset')} className="w-full flex items-center justify-center gap-1.5 text-sm text-slate-400 hover:text-primary-600 transition-colors mt-1">
                     <KeyRound className="w-3.5 h-3.5" /> Mot de passe oublié ?
@@ -162,7 +154,6 @@ export default function AuthPage() {
                 )}
               </form>
             )}
-
             <p className="text-center text-xs text-slate-400 mt-6 flex items-center justify-center gap-1">
               <Sparkles className="w-3 h-3" /> Conforme CGI OTR 2025 · Code du Travail Togo 2021
             </p>

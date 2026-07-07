@@ -22,8 +22,8 @@
     "recharts": "^3.9.1",
     "resend": "^6.16.0",
     "@vercel/blob": "^0.27.0",
-    "@neondatabase/auth": "^0.2.0",
-    "@neondatabase/auth-ui": "^0.2.0"
+    "@neondatabase/auth": "^0.4.2-beta",
+    "@neondatabase/auth-ui": "^0.2.1-beta"
   },
   "devDependencies": {
     "@types/papaparse": "^5.3.14",

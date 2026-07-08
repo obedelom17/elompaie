@@ -1,14 +1,20 @@
 /**
- * Client API — toutes les requêtes vers /api/* (Vercel Functions → Neon)
+ * Client API — toutes les requêtes vers /api/* avec JWT Bearer token
  */
 
 const BASE = '/api'
 
+// Token stocké en mémoire (défini par AuthContext)
+let _token: string | null = null
+export function setAuthToken(t: string | null) { _token = t }
+
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (_token) headers['Authorization'] = `Bearer ${_token}`
+
   const res = await fetch(`${BASE}${path}`, {
     method,
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
+    headers,
     ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
   })
   const data = await res.json()
@@ -18,11 +24,6 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 
 // ── Auth ──────────────────────────────────────────────────────────────────
 export const authApi = {
-  signIn: (email: string, password: string) =>
-    request<any>('POST', '/auth/sign-in/email', { email, password }),
-  signUp: (email: string, password: string, orgName: string) =>
-    request<any>('POST', '/auth/signup-org', { email, password, orgName }),
-  signOut: () => request<any>('POST', '/auth/sign-out', {}),
   me: () => request<any>('GET', '/auth/me'),
 }
 
@@ -72,12 +73,13 @@ export const activityApi = {
 // ── Logo upload → Vercel Blob ─────────────────────────────────────────────
 export async function uploadLogo(file: File): Promise<string> {
   const arrayBuffer = await file.arrayBuffer()
-  const res = await fetch(`${BASE}/upload-logo`, {
-    method: 'POST',
-    credentials: 'include',
-    headers: { 'x-content-type': file.type, 'x-filename': file.name },
-    body: arrayBuffer,
-  })
+  const headers: Record<string, string> = {
+    'x-content-type': file.type,
+    'x-filename': file.name,
+  }
+  if (_token) headers['Authorization'] = `Bearer ${_token}`
+
+  const res = await fetch(`${BASE}/upload-logo`, { method: 'POST', headers, body: arrayBuffer })
   const data = await res.json()
   if (!res.ok) throw new Error(data.error)
   return data.url

@@ -22,7 +22,7 @@
     "recharts": "^3.9.1",
     "resend": "^6.16.0",
     "@vercel/blob": "^0.27.0",
-    "@neondatabase/auth": "^0.4.2-beta"
+    "better-auth": "^1.6.23"
   },
   "devDependencies": {
     "@types/papaparse": "^5.3.14",

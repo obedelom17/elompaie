@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { authApi } from '../lib/api'
+import { authClient } from '../lib/auth-client'
 import { Calculator, Mail, Lock, Building2, Loader2, Eye, EyeOff, AlertCircle, CheckCircle, Sparkles, KeyRound } from 'lucide-react'
 
 export default function AuthPage() {
@@ -19,7 +19,7 @@ export default function AuthPage() {
   const handleReset = async (e: React.FormEvent) => {
     e.preventDefault(); setError(null); setLoading(true)
     try {
-      await authApi.resetPassword(email)
+      await (authClient as any).requestPasswordReset({ email, redirectTo: '/auth?reset=true' })
       setSuccess('Lien de réinitialisation envoyé. Vérifiez votre boîte mail.')
     } catch (err: any) { setError(err.message) }
     setLoading(false)

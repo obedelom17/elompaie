@@ -1,6 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
-import { authClient, getJWTToken } from '../lib/auth-client'
-import { setAuthToken } from '../lib/api'
+import { authClient } from '../lib/auth-client'
 
 interface OrgInfo { id: string; name: string }
 interface UserInfo { id: string; email: string; name?: string }
@@ -10,23 +9,18 @@ interface AuthContextType {
   loading: boolean
   signIn: (email: string, password: string) => Promise<{ error: string | null }>
   signUp: (email: string, password: string, orgName: string) => Promise<{ error: string | null }>
-  signOut: () => void
+  signOut: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-async function refreshToken() {
-  const jwt = await getJWTToken()
-  if (jwt) setAuthToken(jwt)
-  return jwt
-}
-
-async function fetchOrg(jwt: string) {
+async function loadOrg(): Promise<OrgInfo | null> {
   try {
-    const res = await fetch('/api/auth/me', { headers: { Authorization: `Bearer ${jwt}` } })
-    if (res.ok) return (await res.json()).org
-  } catch {}
-  return null
+    const res = await fetch('/api/auth/me', { credentials: 'include' })
+    if (!res.ok) return null
+    const data = await res.json()
+    return data.org || null
+  } catch { return null }
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -35,52 +29,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    authClient.getSession().then(async (res: any) => {
-      const userData = res?.data?.user ?? res?.user
-      if (userData) {
-        setUser({ id: userData.id, email: userData.email, name: userData.name })
-        const jwt = await refreshToken()
-        if (jwt) setOrg(await fetchOrg(jwt))
+    authClient.getSession().then(async ({ data }: any) => {
+      if (data?.user) {
+        setUser({ id: data.user.id, email: data.user.email, name: data.user.name })
+        setOrg(await loadOrg())
       }
-      setLoading(false)
-    }).catch(() => setLoading(false))
+    }).catch(console.error).finally(() => setLoading(false))
   }, [])
 
   const signIn = async (email: string, password: string) => {
-    const res = await authClient.signIn.email({ email, password }) as any
-    if (res.error) return { error: res.error.message || 'Erreur de connexion' }
-    const userData = res.data?.user ?? res.user
-    if (userData) {
-      setUser({ id: userData.id, email: userData.email })
-      const jwt = await refreshToken()
-      if (jwt) setOrg(await fetchOrg(jwt))
+    const { data, error } = await authClient.signIn.email({ email, password, fetchOptions: { credentials: 'include' } }) as any
+    if (error) return { error: error.message || 'Email ou mot de passe incorrect' }
+    if (data?.user) {
+      setUser({ id: data.user.id, email: data.user.email, name: data.user.name })
+      setOrg(await loadOrg())
     }
     return { error: null }
   }
 
   const signUp = async (email: string, password: string, orgName: string) => {
     try {
-      const res = await authClient.signUp.email({ email, password, name: email.split('@')[0] }) as any
-      if (res.error) return { error: res.error.message }
+      // 1. Créer le compte
+      const { error } = await authClient.signUp.email({
+        email, password, name: email.split('@')[0],
+        fetchOptions: { credentials: 'include' }
+      }) as any
+      if (error) return { error: error.message }
 
-      // Sign in après inscription
-      const signInRes = await authClient.signIn.email({ email, password }) as any
-      if (signInRes.error) return { error: signInRes.error.message }
+      // 2. Se connecter pour obtenir la session cookie
+      const { data: signInData, error: signInError } = await authClient.signIn.email({
+        email, password, fetchOptions: { credentials: 'include' }
+      }) as any
+      if (signInError) return { error: signInError.message }
+      if (signInData?.user) setUser({ id: signInData.user.id, email: signInData.user.email })
 
-      const userData = signInRes.data?.user ?? signInRes.user
-      if (userData) setUser({ id: userData.id, email: userData.email })
-
-      const jwt = await refreshToken()
-      if (!jwt) return { error: 'Token introuvable après connexion' }
-
-      // Créer organisation
+      // 3. Créer l'organisation (le cookie est maintenant envoyé automatiquement)
       const orgRes = await fetch('/api/auth/signup-org', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${jwt}` },
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ orgName }),
       })
       const orgData = await orgRes.json()
-      if (!orgRes.ok) return { error: orgData.error }
+      if (!orgRes.ok) return { error: orgData.error || 'Erreur création organisation' }
 
       setOrg(orgData.org)
       return { error: null }
@@ -88,8 +79,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const handleSignOut = async () => {
-    await authClient.signOut()
-    setUser(null); setOrg(null); setAuthToken(null)
+    await authClient.signOut({ fetchOptions: { credentials: 'include' } })
+    setUser(null); setOrg(null)
   }
 
   return (

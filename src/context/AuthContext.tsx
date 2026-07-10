@@ -3,6 +3,7 @@ import { authClient } from '../lib/auth-client'
 
 interface OrgInfo { id: string; name: string }
 interface UserInfo { id: string; email: string; name?: string }
+
 interface AuthContextType {
   user: UserInfo | null
   org: OrgInfo | null
@@ -14,7 +15,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-async function loadOrg(): Promise<OrgInfo | null> {
+async function fetchOrg(): Promise<OrgInfo | null> {
   try {
     const res = await fetch('/api/auth/me', { credentials: 'include' })
     if (!res.ok) return null
@@ -29,41 +30,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    authClient.getSession().then(async ({ data }: any) => {
-      if (data?.user) {
-        setUser({ id: data.user.id, email: data.user.email, name: data.user.name })
-        setOrg(await loadOrg())
-      }
-    }).catch(console.error).finally(() => setLoading(false))
+    authClient.getSession()
+      .then(async ({ data }: any) => {
+        if (data?.user) {
+          setUser({ id: data.user.id, email: data.user.email, name: data.user.name })
+          setOrg(await fetchOrg())
+        }
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false))
   }, [])
 
   const signIn = async (email: string, password: string) => {
-    const { data, error } = await authClient.signIn.email({ email, password, fetchOptions: { credentials: 'include' } }) as any
+    const { data, error } = await authClient.signIn.email({ email, password }) as any
     if (error) return { error: error.message || 'Email ou mot de passe incorrect' }
     if (data?.user) {
       setUser({ id: data.user.id, email: data.user.email, name: data.user.name })
-      setOrg(await loadOrg())
+      setOrg(await fetchOrg())
     }
     return { error: null }
   }
 
   const signUp = async (email: string, password: string, orgName: string) => {
     try {
-      // 1. Créer le compte
+      // 1. Inscription
       const { error } = await authClient.signUp.email({
-        email, password, name: email.split('@')[0],
-        fetchOptions: { credentials: 'include' }
+        email,
+        password,
+        name: email.split('@')[0],
       }) as any
       if (error) return { error: error.message }
 
-      // 2. Se connecter pour obtenir la session cookie
-      const { data: signInData, error: signInError } = await authClient.signIn.email({
-        email, password, fetchOptions: { credentials: 'include' }
-      }) as any
+      // 2. Connexion auto
+      const { data, error: signInError } = await authClient.signIn.email({ email, password }) as any
       if (signInError) return { error: signInError.message }
-      if (signInData?.user) setUser({ id: signInData.user.id, email: signInData.user.email })
+      if (data?.user) setUser({ id: data.user.id, email: data.user.email })
 
-      // 3. Créer l'organisation (le cookie est maintenant envoyé automatiquement)
+      // 3. Créer organisation
       const orgRes = await fetch('/api/auth/signup-org', {
         method: 'POST',
         credentials: 'include',
@@ -72,15 +75,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
       const orgData = await orgRes.json()
       if (!orgRes.ok) return { error: orgData.error || 'Erreur création organisation' }
-
       setOrg(orgData.org)
       return { error: null }
-    } catch (e: any) { return { error: e.message } }
+    } catch (e: any) {
+      return { error: e.message }
+    }
   }
 
   const handleSignOut = async () => {
-    await authClient.signOut({ fetchOptions: { credentials: 'include' } })
-    setUser(null); setOrg(null)
+    await authClient.signOut()
+    setUser(null)
+    setOrg(null)
   }
 
   return (

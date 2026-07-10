@@ -7,6 +7,7 @@ export default async function handler(req, res) {
     const auth = getAuth()
     return auth.handler(req, res)
   } catch (e) {
+    console.error('[auth handler error]', e)
     return res.status(500).json({ error: e.message })
   }
 }

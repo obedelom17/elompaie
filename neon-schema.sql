@@ -1,21 +1,63 @@
 -- ============================================================
--- ElomPaie — Schéma Neon PostgreSQL
--- Exécuter dans Neon SQL Editor
+-- ElomPaie — Schéma complet Neon PostgreSQL
+-- ÉTAPE 1: Exécuter ce fichier dans Neon SQL Editor
 -- ============================================================
 
--- 1. Organisations (à créer AVANT better-auth migrate)
+-- Tables Better Auth (créées manuellement)
+CREATE TABLE IF NOT EXISTS "user" (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  email TEXT NOT NULL UNIQUE,
+  "emailVerified" BOOLEAN NOT NULL DEFAULT FALSE,
+  image TEXT,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  organization_id TEXT DEFAULT NULL
+);
+
+CREATE TABLE IF NOT EXISTS session (
+  id TEXT PRIMARY KEY,
+  "expiresAt" TIMESTAMPTZ NOT NULL,
+  token TEXT NOT NULL UNIQUE,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "ipAddress" TEXT,
+  "userAgent" TEXT,
+  "userId" TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS account (
+  id TEXT PRIMARY KEY,
+  "accountId" TEXT NOT NULL,
+  "providerId" TEXT NOT NULL,
+  "userId" TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+  "accessToken" TEXT,
+  "refreshToken" TEXT,
+  "idToken" TEXT,
+  "accessTokenExpiresAt" TIMESTAMPTZ,
+  "refreshTokenExpiresAt" TIMESTAMPTZ,
+  scope TEXT,
+  password TEXT,
+  "createdAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS verification (
+  id TEXT PRIMARY KEY,
+  identifier TEXT NOT NULL,
+  value TEXT NOT NULL,
+  "expiresAt" TIMESTAMPTZ NOT NULL,
+  "createdAt" TIMESTAMPTZ DEFAULT NOW(),
+  "updatedAt" TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Tables ElomPaie
 CREATE TABLE IF NOT EXISTS organizations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 2. Après "npx better-auth generate" + "npx better-auth migrate":
---    Better Auth crée automatiquement les tables: user, session, account, verification
---    Ensuite ajouter la colonne organization_id:
-ALTER TABLE "user" ADD COLUMN IF NOT EXISTS organization_id UUID REFERENCES organizations(id);
-
--- 3. Clients
 CREATE TABLE IF NOT EXISTS clients (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
@@ -25,7 +67,6 @@ CREATE TABLE IF NOT EXISTS clients (
   created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 4. Employés
 CREATE TABLE IF NOT EXISTS employees (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   client_id UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
@@ -38,7 +79,6 @@ CREATE TABLE IF NOT EXISTS employees (
   created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 5. Périodes de paie
 CREATE TABLE IF NOT EXISTS payroll_periods (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   client_id UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
@@ -49,7 +89,6 @@ CREATE TABLE IF NOT EXISTS payroll_periods (
   UNIQUE(client_id, period_year, period_month)
 );
 
--- 6. Variables de paie
 CREATE TABLE IF NOT EXISTS payroll_variables (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   period_id UUID NOT NULL REFERENCES payroll_periods(id) ON DELETE CASCADE,
@@ -79,7 +118,6 @@ CREATE TABLE IF NOT EXISTS payroll_variables (
   UNIQUE(period_id, employee_id)
 );
 
--- 7. Grilles salariales
 CREATE TABLE IF NOT EXISTS salary_grids (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   client_id UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
@@ -88,7 +126,6 @@ CREATE TABLE IF NOT EXISTS salary_grids (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 8. Logs d'activité
 CREATE TABLE IF NOT EXISTS activity_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   organization_id UUID REFERENCES organizations(id) ON DELETE CASCADE,
@@ -96,9 +133,10 @@ CREATE TABLE IF NOT EXISTS activity_logs (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Index
 CREATE INDEX IF NOT EXISTS idx_clients_org ON clients(organization_id);
 CREATE INDEX IF NOT EXISTS idx_employees_client ON employees(client_id);
 CREATE INDEX IF NOT EXISTS idx_payroll_client ON payroll_periods(client_id);
 CREATE INDEX IF NOT EXISTS idx_payroll_vars_period ON payroll_variables(period_id);
 CREATE INDEX IF NOT EXISTS idx_activity_org ON activity_logs(organization_id);
+CREATE INDEX IF NOT EXISTS idx_session_userId ON session("userId");
+CREATE INDEX IF NOT EXISTS idx_session_token ON session(token);

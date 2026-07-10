@@ -3,17 +3,13 @@ const BASE = '/api'
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     method,
-    credentials: 'include', // envoie les cookies de session better-auth
+    credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
     ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
   })
   const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
   if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`)
   return data as T
-}
-
-export const authApi = {
-  me: () => request<any>('GET', '/auth/me'),
 }
 
 export const clientsApi = {

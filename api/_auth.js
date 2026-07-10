@@ -1,5 +1,6 @@
 import { betterAuth } from 'better-auth'
 import { Pool } from '@neondatabase/serverless'
+import { PostgresDialect } from 'kysely'
 
 let _auth = null
 
@@ -9,10 +10,7 @@ export function getAuth() {
   const pool = new Pool({ connectionString: process.env.DATABASE_URL })
 
   _auth = betterAuth({
-    database: {
-      type: 'postgresql',
-      db: pool,
-    },
+    database: new PostgresDialect({ pool }),
     emailAndPassword: {
       enabled: true,
       requireEmailVerification: false,
@@ -46,9 +44,9 @@ export async function requireAuth(req) {
   const sql = neon(process.env.DATABASE_URL)
 
   const rows = await sql`
-    SELECT u.id, u.email, u."organization_id", o.name as org_name
+    SELECT u.id, u.email, u.organization_id, o.name as org_name
     FROM "user" u
-    LEFT JOIN organizations o ON u."organization_id"::uuid = o.id
+    LEFT JOIN organizations o ON u.organization_id::uuid = o.id
     WHERE u.id = ${session.user.id}
   `
 

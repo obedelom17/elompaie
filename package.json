@@ -22,7 +22,8 @@
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.26.0",
     "recharts": "^3.9.1",
-    "resend": "^6.16.0"
+    "resend": "^6.16.0",
+    "kysely": "^0.29.3"
   },
   "devDependencies": {
     "@types/papaparse": "^5.3.14",

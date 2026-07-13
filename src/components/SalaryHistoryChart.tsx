@@ -10,7 +10,10 @@ interface PayrollVar {
   net_payable: number
   irpp_net?: number
   its_net?: number
+  // Support nested or flat period fields
   payroll_periods?: { period_year: number; period_month: number }
+  period_year?: number
+  period_month?: number
 }
 
 interface Props {
@@ -34,19 +37,23 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 export function SalaryHistoryChart({ variables }: Props) {
   const data = useMemo(() => {
     return [...variables]
-      .filter(v => v.payroll_periods)
+      .filter(v => v.payroll_periods || (v.period_year && v.period_month))
       .sort((a, b) => {
-        const ya = a.payroll_periods!.period_year * 100 + a.payroll_periods!.period_month
-        const yb = b.payroll_periods!.period_year * 100 + b.payroll_periods!.period_month
+        const ya = (a.payroll_periods?.period_year ?? a.period_year ?? 0) * 100 + (a.payroll_periods?.period_month ?? a.period_month ?? 0)
+        const yb = (b.payroll_periods?.period_year ?? b.period_year ?? 0) * 100 + (b.payroll_periods?.period_month ?? b.period_month ?? 0)
         return ya - yb
       })
       .slice(-12)
-      .map(v => ({
-        mois: `${MONTH_NAMES[v.payroll_periods!.period_month - 1].slice(0, 3)} ${v.payroll_periods!.period_year}`,
-        'Brut': v.gross_salary,
-        'Net': v.net_payable,
-        'IRPP': v.irpp_net || v.its_net || 0,
-      }))
+      .map(v => {
+        const year = v.payroll_periods?.period_year ?? v.period_year ?? 0
+        const month = v.payroll_periods?.period_month ?? v.period_month ?? 1
+        return {
+          mois: `${MONTH_NAMES[month - 1].slice(0, 3)} ${year}`,
+          'Brut': v.gross_salary,
+          'Net': v.net_payable,
+          'IRPP': v.irpp_net || v.its_net || 0,
+        }
+      })
   }, [variables])
 
   if (data.length === 0) return (

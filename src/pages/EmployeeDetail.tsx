@@ -75,7 +75,7 @@ export default function EmployeeDetail() {
       {payrollHistory.length > 0 && (
         <div className="card p-6">
           <h2 className="font-semibold text-slate-900 mb-4 flex items-center gap-2"><TrendingUp className="w-5 h-5 text-primary-500" /> Historique de paie</h2>
-          <SalaryHistoryChart data={payrollHistory} />
+          <SalaryHistoryChart variables={payrollHistory} />
           <div className="mt-4 space-y-2">
             {payrollHistory.slice(0, 6).map((v, i) => (
               <div key={i} className="flex items-center justify-between py-2 border-b border-slate-50 last:border-0 text-sm">
@@ -93,8 +93,8 @@ export default function EmployeeDetail() {
           <div className="space-y-2 text-sm">
             <SoldeRow label="Préavis (1 mois)" value={lastVar.net_payable||0} />
             {severance !== null && <SoldeRow label="Indemnité de licenciement" value={severance} />}
-            <SoldeRow label="Congés non pris (estimé)" value={calcIndemniteCongésNonPris(lastVar.base_salary||0)} />
-            <div className="border-t border-slate-200 pt-2 mt-2"><SoldeRow label="Total estimé" value={(lastVar.net_payable||0) + (severance||0) + calcIndemniteCongésNonPris(lastVar.base_salary||0)} bold /></div>
+            <SoldeRow label="Congés non pris (estimé)" value={calcIndemniteCongésNonPris(lastVar.base_salary||0, anciennete.years * 12 + anciennete.months).montant} />
+            <div className="border-t border-slate-200 pt-2 mt-2"><SoldeRow label="Total estimé" value={(lastVar.net_payable||0) + (severance||0) + calcIndemniteCongésNonPris(lastVar.base_salary||0, anciennete.years * 12 + anciennete.months).montant} bold /></div>
           </div>
           <p className="text-xs text-slate-400 mt-3">Estimation indicative · Vérifier selon le motif de départ</p>
         </div>

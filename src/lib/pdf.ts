@@ -363,13 +363,16 @@ export function generateDeclarationIRPP(periods: any[], variables: any[], orgNam
 }
 
 // Archivage PDF — Cloudinary via /api/upload-logo
-export async function uploadBulletinToStorage(pdfDoc: jsPDF, employeeId: string, periodLabel: string, _orgId: string): Promise<{ url: string | null; error: string | null }> {
+export async function uploadBulletinToStorage(pdfDoc: jsPDF, _employeeId: string, periodLabel: string, _orgId: string): Promise<{ url: string | null; error: string | null }> {
   try {
-    const pdfBlob = pdfDoc.output('blob')
-    const file = new File([pdfBlob], `${periodLabel.replace(/\s/g, '-')}.pdf`, { type: 'application/pdf' })
-    const token = localStorage.getItem('auth_token')
-    const form = new FormData(); form.append('file', file)
-    const res = await fetch('/api/upload-logo', { method: 'POST', headers: token ? { Authorization: `Bearer ${token}` } : {}, body: form })
+    const pdfArrayBuffer = pdfDoc.output('arraybuffer')
+    const filename = `${periodLabel.replace(/\s/g, '-')}.pdf`
+    const res = await fetch('/api/upload-logo', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'x-content-type': 'application/pdf', 'x-filename': filename },
+      body: pdfArrayBuffer,
+    })
     const data = await res.json()
     if (!res.ok) return { url: null, error: data.error }
     return { url: data.url, error: null }

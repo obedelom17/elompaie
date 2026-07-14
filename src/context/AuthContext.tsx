@@ -30,7 +30,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    authClient.adapter.getSession()
+    // authClient est déjà l'adapter (createAuthClient retourne .adapter directement)
+    authClient.getSession()
       .then(async ({ data }: any) => {
         if (data?.user) {
           setUser({ id: data.user.id, email: data.user.email, name: data.user.name })
@@ -42,7 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const signIn = async (email: string, password: string) => {
-    const { data, error } = await authClient.adapter.signIn.email({ email, password }) as any
+    const { data, error } = await (authClient as any).signIn.email({ email, password })
     if (error) return { error: error.message || 'Email ou mot de passe incorrect' }
     if (data?.user) {
       setUser({ id: data.user.id, email: data.user.email, name: data.user.name })
@@ -53,20 +54,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signUp = async (email: string, password: string, orgName: string) => {
     try {
-      // 1. Inscription
-      const { error } = await authClient.adapter.signUp.email({
+      const { error } = await (authClient as any).signUp.email({
         email,
         password,
         name: email.split('@')[0],
-      }) as any
+      })
       if (error) return { error: error.message }
 
-      // 2. Connexion auto
-      const { data, error: signInError } = await authClient.adapter.signIn.email({ email, password }) as any
+      const { data, error: signInError } = await (authClient as any).signIn.email({ email, password })
       if (signInError) return { error: signInError.message }
       if (data?.user) setUser({ id: data.user.id, email: data.user.email })
 
-      // 3. Créer organisation
       const orgRes = await fetch('/api/auth/signup-org', {
         method: 'POST',
         credentials: 'include',
@@ -83,7 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const handleSignOut = async () => {
-    await authClient.adapter.signOut()
+    await (authClient as any).signOut()
     setUser(null)
     setOrg(null)
   }

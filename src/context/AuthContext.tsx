@@ -24,13 +24,32 @@ async function fetchOrg(): Promise<OrgInfo | null> {
   } catch { return null }
 }
 
+async function sleep(ms: number) {
+  return new Promise(r => setTimeout(r, ms))
+}
+
+async function createOrg(orgName: string, retries = 3): Promise<OrgInfo> {
+  for (let i = 0; i < retries; i++) {
+    if (i > 0) await sleep(800 * i)
+    const res = await fetch('/api/auth/signup-org', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orgName }),
+    })
+    const data = await res.json()
+    if (res.ok) return data.org
+    if (i === retries - 1) throw new Error(data.error || 'Erreur création organisation')
+  }
+  throw new Error('Erreur création organisation')
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserInfo | null>(null)
   const [org, setOrg] = useState<OrgInfo | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // authClient est déjà l'adapter (createAuthClient retourne .adapter directement)
     authClient.getSession()
       .then(async ({ data }: any) => {
         if (data?.user) {
@@ -54,26 +73,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signUp = async (email: string, password: string, orgName: string) => {
     try {
+      // 1. Inscription
       const { error } = await (authClient as any).signUp.email({
         email,
         password,
-        name: email.split('@')[0],
+        name: orgName, // nom du cabinet comme nom d'utilisateur
       })
       if (error) return { error: error.message }
 
+      // 2. Connexion
       const { data, error: signInError } = await (authClient as any).signIn.email({ email, password })
       if (signInError) return { error: signInError.message }
-      if (data?.user) setUser({ id: data.user.id, email: data.user.email })
+      if (data?.user) setUser({ id: data.user.id, email: data.user.email, name: data.user.name })
 
-      const orgRes = await fetch('/api/auth/signup-org', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orgName }),
-      })
-      const orgData = await orgRes.json()
-      if (!orgRes.ok) return { error: orgData.error || 'Erreur création organisation' }
-      setOrg(orgData.org)
+      // 3. Attendre que le cookie soit bien posé, puis créer l'org avec retry
+      await sleep(500)
+      const newOrg = await createOrg(orgName)
+      setOrg(newOrg)
       return { error: null }
     } catch (e: any) {
       return { error: e.message }

@@ -4,6 +4,7 @@ export const config = { runtime: 'nodejs' }
 export default async function handler(req, res) {
   try {
     const auth = await requireAuth(req)
+    if (!auth.orgId) return res.status(403).json({ error: 'Aucune organisation liée à ce compte' })
     const id = req.query?.id
     if (id) {
       if (req.method === 'GET') {
@@ -43,5 +44,8 @@ export default async function handler(req, res) {
       }
     }
     return res.status(405).end()
-  } catch (e) { return res.status(500).json({ error: e.message }) }
+  } catch (e) {
+    const status = e.message.includes('auth') || e.message.includes('authentif') || e.message.includes('Session') ? 401 : 500
+    return res.status(status).json({ error: e.message })
+  }
 }

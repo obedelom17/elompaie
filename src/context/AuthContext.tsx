@@ -15,7 +15,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-async function sleep(ms: number) { return new Promise(r => setTimeout(r, ms)) }
+function sleep(ms: number) { return new Promise(r => setTimeout(r, ms)) }
 
 async function fetchMe(): Promise<{ user: UserInfo | null; org: OrgInfo | null }> {
   try {
@@ -29,23 +29,27 @@ async function fetchMe(): Promise<{ user: UserInfo | null; org: OrgInfo | null }
   } catch { return { user: null, org: null } }
 }
 
-// Crée ou récupère l'org pour l'user connecté
+async function fetchMeWithRetry(maxAttempts = 5): Promise<{ user: UserInfo | null; org: OrgInfo | null }> {
+  for (let i = 0; i < maxAttempts; i++) {
+    if (i > 0) await sleep(600 * i)
+    const me = await fetchMe()
+    if (me.user) return me
+  }
+  return { user: null, org: null }
+}
+
 async function ensureOrg(orgName?: string): Promise<OrgInfo | null> {
   for (let i = 0; i < 4; i++) {
     if (i > 0) await sleep(800 * i)
     try {
       const res = await fetch('/api/auth/repair-org', {
-        method: 'POST',
-        credentials: 'include',
+        method: 'POST', credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ orgName: orgName || '' }),
       })
       const data = await res.json()
       if (res.ok && data.org) return data.org
-      console.warn(`[ensureOrg] tentative ${i + 1}:`, data.error)
-    } catch (e) {
-      console.warn(`[ensureOrg] tentative ${i + 1}:`, e)
-    }
+    } catch {}
   }
   return null
 }
@@ -58,42 +62,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refreshOrg = async () => {
     const me = await fetchMe()
     if (me.org) setOrg(me.org)
-    else {
-      const fixed = await ensureOrg()
-      if (fixed) setOrg(fixed)
-    }
+    else { const fixed = await ensureOrg(); if (fixed) setOrg(fixed) }
   }
 
   useEffect(() => {
     fetchMe().then(async me => {
       if (me.user) {
         setUser(me.user)
-        if (me.org) {
-          setOrg(me.org)
-        } else {
-          // Org manquante — repair automatique au chargement
-          const fixed = await ensureOrg()
-          if (fixed) setOrg(fixed)
-        }
+        if (me.org) setOrg(me.org)
+        else { const fixed = await ensureOrg(); if (fixed) setOrg(fixed) }
       }
     }).finally(() => setLoading(false))
   }, [])
 
   const signIn = async (email: string, password: string) => {
-    const { data, error } = await (authClient as any).signIn.email({ email, password })
-    if (error) return { error: error.message || 'Email ou mot de passe incorrect' }
-    if (data?.user) {
-      setUser({ id: data.user.id, email: data.user.email })
-      await sleep(400)
-      const me = await fetchMe()
-      if (me.org) {
-        setOrg(me.org)
-      } else {
+    try {
+      const { data, error } = await (authClient as any).signIn.email({ email, password })
+      if (error) return { error: error.message || 'Email ou mot de passe incorrect' }
+
+      // Attendre que le cookie soit posé côté serveur puis vérifier la session
+      await sleep(300)
+      const me = await fetchMeWithRetry(5)
+
+      if (me.user) {
+        setUser(me.user)
+        if (me.org) {
+          setOrg(me.org)
+        } else {
+          const fixed = await ensureOrg()
+          if (fixed) setOrg(fixed)
+        }
+      } else if (data?.user) {
+        // Fallback: utiliser les données retournées par signIn directement
+        setUser({ id: data.user.id, email: data.user.email })
         const fixed = await ensureOrg()
         if (fixed) setOrg(fixed)
       }
+
+      return { error: null }
+    } catch (e: any) {
+      return { error: e.message || 'Erreur de connexion' }
     }
-    return { error: null }
   }
 
   const signUp = async (email: string, password: string, orgName: string) => {
@@ -104,9 +113,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await sleep(400)
       const { data, error: signInError } = await (authClient as any).signIn.email({ email, password })
       if (signInError) return { error: signInError.message }
-      if (data?.user) setUser({ id: data.user.id, email: data.user.email })
 
       await sleep(500)
+      const me = await fetchMeWithRetry(4)
+      if (me.user) setUser(me.user)
+      else if (data?.user) setUser({ id: data.user.id, email: data.user.email })
+
       const newOrg = await ensureOrg(orgName)
       if (newOrg) setOrg(newOrg)
 
@@ -117,7 +129,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const handleSignOut = async () => {
-    await (authClient as any).signOut()
+    try { await (authClient as any).signOut() } catch {}
     setUser(null); setOrg(null)
   }
 

@@ -47,11 +47,27 @@ export default function ExportReports() {
     apiFetch('/api/payroll').then(d => setPeriods(d)).catch(()=>{})
   }, [])
 
+  // Employés pour onglet Solde
   useEffect(() => {
     if (sClient) {
       apiFetch(`/api/employees?client_id=${sClient}`).then(d => setEmployees(d)).catch(()=>{})
     }
   }, [sClient])
+
+  // Employés pour onglet Bulletin (depuis client_id de la période)
+  const [bulletinEmployees, setBulletinEmployees] = useState<Employee[]>([])
+  useEffect(() => {
+    if (bPeriod) {
+      const p = periods.find(p => p.id === bPeriod)
+      if (p?.client_id) {
+        apiFetch(`/api/employees?client_id=${p.client_id}`)
+          .then(d => setBulletinEmployees(d))
+          .catch(() => {})
+      }
+    } else {
+      setBulletinEmployees([])
+    }
+  }, [bPeriod, periods])
 
   async function download(url: string, body: object, filename: string) {
     setLoading(true); setMsg(null)
@@ -94,7 +110,7 @@ export default function ExportReports() {
           `Bulletin_${emp.last_name}_${mois}_${annee}.xlsx`)
       }
     } else {
-      const emp = employees.find(e=>e.id===bEmployee) || {last_name:'Employe'}
+      const emp = bulletinEmployees.find(e=>e.id===bEmployee) || {last_name:'Employe'}
       await download('/api/export-bulletin',
         { period_id: bPeriod, employee_id: bEmployee },
         `Bulletin_${(emp as any).last_name}_${mois}_${annee}.xlsx`)
@@ -187,12 +203,9 @@ export default function ExportReports() {
                   <label className={labelCls}>Employé</label>
                   <select className={inputCls} value={bEmployee} onChange={e=>setBEmployee(e.target.value)}>
                     <option value="">— Sélectionner —</option>
-                    {periods.find(p=>p.id===bPeriod) && employees
-                      .filter(()=>true)
-                      .map(e=>(
-                        <option key={e.id} value={e.id}>{e.last_name} {e.first_name}</option>
-                      ))
-                    }
+                    {bulletinEmployees.map(e=>(
+                      <option key={e.id} value={e.id}>{e.last_name} {e.first_name}</option>
+                    ))}
                   </select>
                 </div>
               )}

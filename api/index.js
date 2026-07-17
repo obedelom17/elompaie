@@ -19,20 +19,58 @@ const NEON_AUTH_BASE_URL = process.env.NEON_AUTH_BASE_URL
 // ─── AUTH HELPERS ─────────────────────────────────────────────────────────────
 async function authMe(req, res) {
   try {
-    if (!NEON_AUTH_BASE_URL) throw new Error('NEON_AUTH_BASE_URL non configuré')
-    const sessionRes = await fetch(`${NEON_AUTH_BASE_URL}/get-session`, {
-      headers: { cookie: req.headers?.cookie || '' },
-      signal: AbortSignal.timeout(5000),
-    })
-    if (!sessionRes.ok) return res.status(401).json({ error: 'Session invalide' })
-    const session = await sessionRes.json()
+    if (!NEON_AUTH_BASE_URL) return res.status(500).json({ error: 'NEON_AUTH_BASE_URL non configuré' })
+    const cookieHeader = req.headers?.cookie || ''
+    if (!cookieHeader) return res.status(401).json({ error: 'Non authentifié' })
+
+    let session
+    try {
+      const sessionRes = await fetch(`${NEON_AUTH_BASE_URL}/get-session`, {
+        headers: { cookie: cookieHeader },
+        signal: AbortSignal.timeout(8000),
+      })
+      if (!sessionRes.ok) return res.status(401).json({ error: 'Session invalide' })
+      session = await sessionRes.json()
+    } catch (e) {
+      return res.status(500).json({ error: `Erreur session Neon Auth: ${e.message}` })
+    }
+
     const userId = session?.user?.id
     if (!userId) return res.status(401).json({ error: 'Non authentifié' })
+
     const db = neon(process.env.DATABASE_URL || process.env.POSTGRES_PRISMA_URL)
-    const rows = await db`SELECT up.organization_id, o.name as org_name FROM user_profiles up LEFT JOIN organizations o ON o.id = up.organization_id WHERE up.user_id = ${userId}`
-    const row = rows[0]
-    return res.status(200).json({ userId, email: session.user.email, org: row?.organization_id ? { id: row.organization_id.toString(), name: row.org_name } : null })
-  } catch (e) { return res.status(500).json({ error: e.message }) }
+
+    // Créer user_profiles si elle n'existe pas
+    try {
+      await db`CREATE TABLE IF NOT EXISTS user_profiles (
+        user_id TEXT PRIMARY KEY,
+        organization_id UUID REFERENCES organizations(id) ON DELETE SET NULL,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      )`
+    } catch {}
+
+    let row = null
+    try {
+      const rows = await db`
+        SELECT up.organization_id, o.name as org_name
+        FROM user_profiles up
+        LEFT JOIN organizations o ON o.id = up.organization_id
+        WHERE up.user_id = ${userId}
+      `
+      row = rows[0] || null
+    } catch (e) {
+      console.error('[authMe] DB error:', e.message)
+    }
+
+    return res.status(200).json({
+      userId,
+      email: session.user.email,
+      org: row?.organization_id ? { id: row.organization_id.toString(), name: row.org_name } : null
+    })
+  } catch (e) {
+    console.error('[authMe]', e.message)
+    return res.status(500).json({ error: e.message })
+  }
 }
 
 async function authRepairOrg(req, res) {

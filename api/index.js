@@ -169,20 +169,41 @@ function sc(ws, addr, val, font, align, border, numFmt) {
 // ─── BULLETIN DE PAIE ─────────────────────────────────────────────────────────
 function genBulletin(wb, sheetName, data) {
   const ws = wb.addWorksheet(sheetName)
-  ws.columns = [
-    { key:'A', width:18.29 }, { key:'B', width:35.0 },
-    { key:'C', width:10.57 }, { key:'D', width:8.86 },
-    { key:'E', width:9.29  }, { key:'F', width:11.43 },
-  ]
-  ws.pageSetup = { orientation:'portrait', paperSize:9,
-    margins:{ left:0.7, right:0.7, top:0.75, bottom:0.75 } }
+  // Largeurs colonnes
+  ws.getColumn(1).width = 18.29  // A
+  ws.getColumn(2).width = 35.0   // B
+  ws.getColumn(3).width = 10.57  // C
+  ws.getColumn(4).width = 8.86   // D
+  ws.getColumn(5).width = 9.29   // E
+  ws.getColumn(6).width = 11.43  // F
+  ws.pageSetup.orientation = 'portrait'
+  ws.pageSetup.paperSize = 9
+  ws.pageSetup.fitToPage = true
+  ws.pageSetup.fitToWidth = 1
+  ws.pageSetup.fitToHeight = 0
 
-  // Logo client
-  if (data.logoBuffer) {
+  // Logo client - détection du format
+  if (data.logoBuffer && data.logoBuffer.length > 4) {
     try {
-      const imgId = wb.addImage({ buffer: data.logoBuffer, extension: 'png' })
-      ws.addImage(imgId, { tl:{ col:0, row:0 }, br:{ col:1, row:9 } })
-    } catch {}
+      // Détecter format par magic bytes
+      let extension = 'png'
+      const b = data.logoBuffer
+      if (b[0] === 0xFF && b[1] === 0xD8) extension = 'jpeg'
+      else if (b[0] === 0x47 && b[1] === 0x49) extension = 'gif'
+      else if (b[0] === 0x89 && b[1] === 0x50) extension = 'png'
+      else if (b[0] === 0x52 && b[1] === 0x49) extension = 'png' // WEBP/RIFF → skip
+      
+      // Ne pas insérer WEBP (non supporté par Excel)
+      if (extension !== 'gif') {
+        const imgId = wb.addImage({ buffer: data.logoBuffer, extension })
+        ws.addImage(imgId, {
+          tl: { col: 0, row: 0 },
+          ext: { width: 150, height: 75 }
+        })
+      }
+    } catch {
+      // Logo invalide - continuer sans image
+    }
   }
 
   ws.mergeCells('A13:B13')

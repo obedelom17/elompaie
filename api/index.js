@@ -559,17 +559,41 @@ function genSolde(wb, sheetName, data) {
     sc(ws,`B${r}`,'AVANCE SUR SOLDE DE TOUT COMPTE', cal(16,true), aln('left'))
     ws.getCell(`H${r}`).value=data.avance||0; ws.getCell(`H${r}`).font=cal(16,true); ws.getCell(`H${r}`).numFmt='#,##0'
     const avR = r; r++
+    // Retenue sur solde de tout compte
+    ws.mergeCells(`B${r}:E${r}`)
+    sc(ws,`B${r}`,'RETENUE SUR SOLDE DE TOUT COMPTE', cal(16,true), aln('left'))
+    ws.getCell(`H${r}`).value=data.retenue_sur_solde||0; ws.getCell(`H${r}`).font=cal(16,true); ws.getCell(`H${r}`).numFmt='#,##0'
+    const retSoldeR = r; r++
     ws.mergeCells(`B${r}:E${r}`)
     sc(ws,`B${r}`,'NET A PAYER', cal(16,true), aln('left'))
-    ws.getCell(`H${r}`).value={formula:`H${netR}-H${preR}-H${avR}`}; ws.getCell(`H${r}`).font=cal(16,true); ws.getCell(`H${r}`).numFmt='#,##0'
+    ws.getCell(`H${r}`).value={formula:`H${netR}-H${preR}-H${avR}-H${retSoldeR}`}; ws.getCell(`H${r}`).font=cal(16,true); ws.getCell(`H${r}`).numFmt='#,##0'
+    const netPayR = r; r++
+    // Solde final
+    ws.mergeCells(`B${r}:E${r}`)
+    sc(ws,`B${r}`,'SOLDE', cal(18,true), aln('left'))
+    ws.getCell(`B${r}`).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFD9E1F2'}}
+    ws.getCell(`H${r}`).value={formula:`H${netPayR}`}; ws.getCell(`H${r}`).font=cal(18,true); ws.getCell(`H${r}`).numFmt='#,##0'
+    ws.getCell(`H${r}`).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFD9E1F2'}}
   } else {
     ws.mergeCells(`B${r}:E${r}`)
     sc(ws,`B${r}`,'AVANCE SUR SOLDE DE TOUT COMPTE', cal(16,true), aln('left'))
     ws.getCell(`H${r}`).value=data.avance||0; ws.getCell(`H${r}`).font=cal(16,true); ws.getCell(`H${r}`).numFmt='#,##0'
     const avR = r; r++
+    // Retenue sur solde de tout compte
+    ws.mergeCells(`B${r}:E${r}`)
+    sc(ws,`B${r}`,'RETENUE SUR SOLDE DE TOUT COMPTE', cal(16,true), aln('left'))
+    ws.getCell(`H${r}`).value=data.retenue_sur_solde||0; ws.getCell(`H${r}`).font=cal(16,true); ws.getCell(`H${r}`).numFmt='#,##0'
+    const retSoldeR = r; r++
     ws.mergeCells(`B${r}:E${r}`)
     sc(ws,`B${r}`,'NET A PAYER', cal(16,true), aln('left'))
-    ws.getCell(`H${r}`).value={formula:`H${netR}-H${avR}`}; ws.getCell(`H${r}`).font=cal(16,true); ws.getCell(`H${r}`).numFmt='#,##0'
+    ws.getCell(`H${r}`).value={formula:`H${netR}-H${avR}-H${retSoldeR}`}; ws.getCell(`H${r}`).font=cal(16,true); ws.getCell(`H${r}`).numFmt='#,##0'
+    const netPayR = r; r++
+    // Solde final
+    ws.mergeCells(`B${r}:E${r}`)
+    sc(ws,`B${r}`,'SOLDE', cal(18,true), aln('left'))
+    ws.getCell(`B${r}`).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFD9E1F2'}}
+    ws.getCell(`H${r}`).value={formula:`H${netPayR}`}; ws.getCell(`H${r}`).font=cal(18,true); ws.getCell(`H${r}`).numFmt='#,##0'
+    ws.getCell(`H${r}`).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFD9E1F2'}}
   }
 
   if (jours.length) {
@@ -642,7 +666,6 @@ export default async function handler(req, res) {
       if (v.indemnite_transport)     rubriques.push({ label:'Indemnité de Transport',    base:v.indemnite_transport,     taux_ou_nb:30 })
       if (v.indemnite_repas)         rubriques.push({ label:'Indemnité de repas',        base:v.indemnite_repas,         taux_ou_nb:30 })
       if (v.indemnite_communication) rubriques.push({ label:'Indemnité de communication',base:v.indemnite_communication, taux_ou_nb:30 })
-      if (v.indemnite_grossesse)     rubriques.push({ label:'Indemnité de grossesse',    base:v.indemnite_grossesse,     taux_ou_nb:30 })
 
       let logoBuffer = null
       if (v.logo_url) {
@@ -652,7 +675,13 @@ export default async function handler(req, res) {
         } catch {}
       }
 
-      const irpp_base = Math.floor((brut*0.91 - Math.min(brut*0.91*12,10_000_000)*0.28/12 - pers*10_000)/1000)*1000
+      // IRPP: brut imposable = brut × (1 - 4% - 5%), annualisé puis régularisé
+      const brutImposableMensuel = brut * (1 - 0.04 - 0.05)
+      const revenuAnnuel = brutImposableMensuel * 12
+      const abattement = Math.min(revenuAnnuel, 10_000_000) * 0.28
+      const chargesFamille = pers * 10_000 * 12
+      const imposableAnnuel = Math.floor(Math.max(0, revenuAnnuel - abattement - chargesFamille) / 1000) * 1000
+      const irpp_base = Math.round(imposableAnnuel / 12)
 
       const wb2 = new ExcelJS.Workbook()
       genBulletin(wb2, `${(v.last_name||'').substring(0,3)} ${mois.substring(0,4)} ${v.period_year}`, {
@@ -795,7 +824,8 @@ export default async function handler(req, res) {
       await requireAuth(req)
       const { employee_id, period_id, date_depart, date_fin_contrat,
               jours_conges_list, taux_conges_auto, taux_conges_manuel,
-              avance, preavis, inclure_preavis, retenues_arrierees, regularisation_irpp } = req.body
+              avance, preavis, inclure_preavis, retenues_arrierees, regularisation_irpp,
+              retenue_sur_solde } = req.body
       const db = neon(DB_URL())
       const [emp] = await db`SELECT e.*, c.name as client_name FROM employees e JOIN clients c ON c.id=e.client_id WHERE e.id=${employee_id}`
       if (!emp) return res.status(404).json({ error: 'Employé introuvable' })
@@ -831,11 +861,51 @@ export default async function handler(req, res) {
         preavis: preavis || 0,
         inclure_preavis: !!inclure_preavis,
         retenues_arrierees: retenues_arrierees || 0,
+        retenue_sur_solde: retenue_sur_solde || 0,
       })
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
       res.setHeader('Content-Disposition', `attachment; filename="Solde_${emp.last_name}_${fmt(date_depart).replace(/\//g,'-')}.xlsx"`)
       await wb2.xlsx.write(res)
       return res.end()
+    }
+
+    // ── Paramètres ────────────────────────────────────────────────────────────
+    if (path === '/api/settings/org') {
+      const auth = await requireAuth(req)
+      const db = neon(DB_URL())
+      if (method === 'GET') {
+        const rows = await db`SELECT o.id, o.name FROM organizations o JOIN user_profiles up ON up.organization_id=o.id WHERE up.user_id=${auth.userId}`
+        if (!rows.length) return res.status(404).json({ error: 'Organisation introuvable' })
+        return res.status(200).json(rows[0])
+      }
+      if (method === 'PATCH') {
+        const { name } = req.body
+        if (!name?.trim()) return res.status(400).json({ error: 'Nom requis' })
+        const rows = await db`UPDATE organizations SET name=${name.trim()} WHERE id=${auth.orgId} RETURNING id, name`
+        return res.status(200).json(rows[0])
+      }
+      return res.status(405).end()
+    }
+
+    if (path === '/api/settings/change-password') {
+      if (method !== 'POST') return res.status(405).end()
+      await requireAuth(req)
+      const { current_password, new_password } = req.body
+      if (!current_password || !new_password) return res.status(400).json({ error: 'Mots de passe requis' })
+      if (new_password.length < 8) return res.status(400).json({ error: 'Nouveau mot de passe: 8 caractères minimum' })
+      // Proxy vers Neon Auth change-password
+      try {
+        const r = await fetch(`${NEON_AUTH_BASE_URL}/change-password`, {
+          method: 'POST',
+          headers: { 'origin': process.env.BETTER_AUTH_URL||'', 'content-type': 'application/json', 'cookie': req.headers?.cookie || '' },
+          body: JSON.stringify({ currentPassword: current_password, newPassword: new_password }),
+          signal: AbortSignal.timeout(8000),
+        })
+        const data = await r.json().catch(() => ({}))
+        return res.status(r.status).json(r.ok ? { ok: true } : { error: data.message || data.error || 'Erreur changement mot de passe' })
+      } catch (e) {
+        return res.status(500).json({ error: e.message })
+      }
     }
 
     // ── CRUD (nécessite auth) ─────────────────────────────────────────────────

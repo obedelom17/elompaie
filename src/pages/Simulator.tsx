@@ -3,7 +3,7 @@ import { calculatePayroll, formatXOF, calculateSeverancePay, getPreavisDays, Pay
 import { FlaskConical, Calculator, RefreshCw, TrendingUp, Users, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react'
 
 const EMPTY: PayrollInput = {
-  base_salary: 0, overtime_premium: 0, pregnancy_allowance: 0, function_allowance: 0,
+  base_salary: 0, overtime_premium: 0, function_allowance: 0,
   communication_allowance: 0, housing_premium: 0, meal_premium: 0, transport_allowance: 0,
   salary_advance: 0, loan_payment: 0, flat_deduction: 0,
   marital_status: 'celibataire', children_count: 0,
@@ -96,7 +96,6 @@ export default function Simulator() {
                   { k: 'housing_premium', l: 'Prime de logement' },
                   { k: 'meal_premium', l: 'Prime de repas' },
                   { k: 'transport_allowance', l: 'Indemnité transport' },
-                  { k: 'pregnancy_allowance', l: 'Indemnité grossesse' },
                 ].map(({ k, l }) => (
                   <div key={k}>
                     <label className="label">{l}</label>

@@ -6,7 +6,6 @@ export interface PayrollInput {
   overtime_hours?: number
   overtime_rate?: 'h1' | 'h2' | 'h3' // +15% / +50% / +100%
   overtime_premium: number
-  pregnancy_allowance: number
   function_allowance: number
   communication_allowance: number
   housing_premium: number
@@ -112,7 +111,6 @@ export function calculatePayroll(input: PayrollInput): PayrollResult {
     (input.base_salary        || 0) +
     overtime_amount +
     (input.overtime_premium   || 0) +
-    (input.pregnancy_allowance|| 0) +
     (input.function_allowance || 0) +
     (input.communication_allowance || 0) +
     (input.housing_premium    || 0) +
@@ -124,8 +122,10 @@ export function calculatePayroll(input: PayrollInput): PayrollResult {
   const cnss_employee = Math.round(gross_salary * CNSS_EMPLOYEE_RATE)
   const amu_employee = Math.round(gross_salary * AMU_EMPLOYEE_RATE)
 
-  const revenuApresCot = gross_salary - cnss_employee - amu_employee - (input.flat_deduction || 0)
-  const revenuAnnuel   = revenuApresCot * 12
+  // Salaire brut imposable (après CNSS 4% + AMU 5%)
+  const brutImposable  = gross_salary - cnss_employee - amu_employee - (input.flat_deduction || 0)
+  // Annualisation
+  const revenuAnnuel   = brutImposable * 12
   const baseAbat       = Math.min(revenuAnnuel, 10_000_000)
   const abat_annual    = Math.round(baseAbat * 0.28)
   const abattement_28  = Math.round(abat_annual / 12)
@@ -135,6 +135,7 @@ export function calculatePayroll(input: PayrollInput): PayrollResult {
   const chargesFamAnnual = personnes * 10_000 * 12
   const charges_famille  = personnes * 10_000
 
+  // Revenu imposable annuel arrondi à la tranche de 1 000
   const revImposable = Math.floor(Math.max(0, revApresAbat - chargesFamAnnual) / 1000) * 1000
   const irpp_annuel   = calcItsBrutAnnual(revImposable)
   const irpp_net      = Math.round(irpp_annuel / 12)

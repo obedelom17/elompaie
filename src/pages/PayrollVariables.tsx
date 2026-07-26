@@ -7,7 +7,7 @@ import { ArrowLeft, Calculator, FileText, Save, Lock, Loader2, Search, Info, Dow
 
 interface Employee { id: string; first_name: string; last_name: string; matricule: string|null; position: string|null; category: string|null; marital_status: string; children_count: number; client_id: string; email: string|null; phone: string|null; social_security_number: string|null; hire_date: string|null; client_name?: string }
 
-const EMPTY_VARS = { base_salary: 0, overtime_premium: 0, pregnancy_allowance: 0, function_allowance: 0, communication_allowance: 0, housing_premium: 0, meal_premium: 0, transport_allowance: 0, salary_advance: 0, loan_payment: 0, flat_deduction: 0 }
+const EMPTY_VARS = { base_salary: 0, overtime_premium: 0, function_allowance: 0, communication_allowance: 0, housing_premium: 0, meal_premium: 0, transport_allowance: 0, salary_advance: 0, loan_payment: 0, flat_deduction: 0 }
 
 export default function PayrollVariables() {
   const { periodId } = useParams<{ periodId: string }>()
@@ -47,7 +47,7 @@ export default function PayrollVariables() {
     setSelectedEmpId(emp.id)
     const existing = variables.get(emp.id)
     if (existing) {
-      setForm({ base_salary: existing.base_salary||0, overtime_premium: existing.overtime_premium||0, pregnancy_allowance: existing.pregnancy_allowance||0, function_allowance: existing.function_allowance||0, communication_allowance: existing.communication_allowance||0, housing_premium: existing.housing_premium||0, meal_premium: existing.meal_premium||0, transport_allowance: existing.transport_allowance||0, salary_advance: existing.salary_advance||0, loan_payment: existing.loan_payment||0, flat_deduction: existing.flat_deduction||0 })
+      setForm({ base_salary: existing.base_salary||0, overtime_premium: existing.overtime_premium||0, function_allowance: existing.function_allowance||0, communication_allowance: existing.communication_allowance||0, housing_premium: existing.housing_premium||0, meal_premium: existing.meal_premium||0, transport_allowance: existing.transport_allowance||0, salary_advance: existing.salary_advance||0, loan_payment: existing.loan_payment||0, flat_deduction: existing.flat_deduction||0 })
       setResult(calculatePayroll({ ...existing, marital_status: emp.marital_status, children_count: emp.children_count }))
     } else { setForm(EMPTY_VARS); setResult(null) }
   }
@@ -68,7 +68,6 @@ export default function PayrollVariables() {
       period_id: periodId,
       base_salary: form.base_salary || 0,
       sursalaire: form.overtime_premium || 0,
-      indemnite_grossesse: form.pregnancy_allowance || 0,
       indemnite_fonction: form.function_allowance || 0,
       indemnite_communication: form.communication_allowance || 0,
       indemnite_logement: form.housing_premium || 0,
@@ -181,7 +180,7 @@ export default function PayrollVariables() {
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                   {[
                     { key: 'base_salary', label: 'Salaire de base' }, { key: 'overtime_premium', label: 'Sursalaire' },
-                    { key: 'pregnancy_allowance', label: 'Ind. grossesse' }, { key: 'function_allowance', label: 'Ind. de fonction' },
+                    { key: 'function_allowance', label: 'Ind. de fonction' },
                     { key: 'communication_allowance', label: 'Ind. communication' }, { key: 'housing_premium', label: 'Prime logement' },
                     { key: 'meal_premium', label: 'Prime repas' }, { key: 'transport_allowance', label: 'Ind. transport' },
                     { key: 'flat_deduction', label: 'Déduction forfaitaire' }, { key: 'salary_advance', label: 'Avance salaire' },

@@ -20,7 +20,7 @@ export function AIChatbot() {
   const [open, setOpen] = useState(false)
   const [minimized, setMinimized] = useState(false)
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', content: '👋 Bonjour ! Je suis **PaieBot**, votre assistant paie Togo.\n\nJe peux vous aider avec :\n- 📊 Calculs de paie (IRPP, CNSS, AMU)\n- 📋 Questions CGI OTR 2025\n- ⚖️ Code du Travail 2021\n- 💰 Indemnités et primes\n\nQue puis-je faire pour vous ?', ts: Date.now() }
+    { role: 'assistant', content: 'Bonjour ! Je suis PaieBot, votre assistant paie Togo.\n\nJe peux vous aider avec :\n- Calculs de paie (IRPP, CNSS, AMU)\n- Questions CGI OTR 2025\n- Code du Travail 2021\n- Indemnités et primes\n\nQue puis-je faire pour vous ?', ts: Date.now() }
   ])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -77,7 +77,7 @@ export function AIChatbot() {
     } catch (e: any) {
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: `⚠️ Erreur : ${e.message}\n\nVérifiez que la clé GROQ est configurée dans les variables d'environnement Vercel (\`VITE_GROQ_API_KEY\`).`,
+        content: `Erreur : ${e.message}\n\nVérifiez que la clé GROQ est configurée dans les variables d'environnement Vercel (VITE_GROQ_API_KEY).`,
         ts: Date.now()
       }])
     } finally {
@@ -89,7 +89,7 @@ export function AIChatbot() {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() }
   }
 
-  const clear = () => setMessages([{ role: 'assistant', content: '🔄 Nouvelle conversation. Comment puis-je vous aider ?', ts: Date.now() }])
+  const clear = () => setMessages([{ role: 'assistant', content: 'Nouvelle conversation. Comment puis-je vous aider ?', ts: Date.now() }])
 
   function renderContent(content: string) {
     return content

@@ -24,11 +24,33 @@ export function calcIrppAnnuel(revenu) {
 }
 
 export function calcIrppMensuel(brut, persCharge = 0) {
-  const net = brut * (1 - 0.04 - 0.05)
-  const annuel = net * 12
+  // Salaire brut imposable mensuel (après CNSS 4% + AMU 5%)
+  const brutImposable = brut * (1 - 0.04 - 0.05)
+  // Annualisation
+  const annuel = brutImposable * 12
+  // Abattement 28% plafonné à 10 000 000
   const abattement = Math.min(annuel, 10_000_000) * 0.28
-  const imposable = Math.max(0, annuel - abattement - persCharge * 10_000 * 12)
+  // Charges de famille : 10 000 F par personne à charge par mois × 12
+  const chargesFamille = persCharge * 10_000 * 12
+  // Revenu net imposable annuel (arrondi à la tranche inférieure de 1 000)
+  const imposable = Math.floor(Math.max(0, annuel - abattement - chargesFamille) / 1000) * 1000
+  // IRPP annuel selon barème → mensualisation
   return Math.round(calcIrppAnnuel(imposable) / 12)
+}
+
+// Calcul IRPP annuel avec régularisation (cumul glissant)
+// irppVersesCumul = IRPP déjà versés pour les mois précédents de l'année
+export function calcIrppMensuelAvecRegul(brut, persCharge = 0, moisCourant = 1, irppVersesCumul = 0) {
+  const brutImposable = brut * (1 - 0.04 - 0.05)
+  const annuel = brutImposable * 12
+  const abattement = Math.min(annuel, 10_000_000) * 0.28
+  const chargesFamille = persCharge * 10_000 * 12
+  const imposable = Math.floor(Math.max(0, annuel - abattement - chargesFamille) / 1000) * 1000
+  const irppAnnuel = calcIrppAnnuel(imposable)
+  // IRPP théorique cumulé jusqu'au mois courant
+  const irppTheorique = Math.round(irppAnnuel * moisCourant / 12)
+  // IRPP du mois = théorique cumulé - déjà versé
+  return Math.max(0, irppTheorique - irppVersesCumul)
 }
 
 export function calcAnciete(hireDate, baseSalary, sursalaire) {
@@ -42,7 +64,6 @@ export function calcAnciete(hireDate, baseSalary, sursalaire) {
 export function calcBrut(vars) {
   return (vars.base_salary || 0)
     + (vars.sursalaire || 0)
-    + (vars.indemnite_grossesse || 0)
     + (vars.indemnite_fonction || 0)
     + (vars.indemnite_communication || 0)
     + (vars.indemnite_logement || 0)

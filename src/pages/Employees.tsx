@@ -227,7 +227,7 @@ export default function Employees() {
               {/* Grid suggestion */}
               {gridSuggestion && (
                 <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 text-sm text-blue-700 dark:text-blue-300">
-                  💡 Grille salariale trouvée : <strong>{gridSuggestion.base_salary?.toLocaleString('fr-FR')} FCFA</strong> pour {form.category}
+                  Grille salariale trouvée : <strong>{gridSuggestion.base_salary?.toLocaleString('fr-FR')} FCFA</strong> pour {form.category}
                 </div>
               )}
 

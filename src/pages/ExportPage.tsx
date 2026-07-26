@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { payrollApi } from '../lib/api'
 import { Download, FileSpreadsheet, FileText, Loader2, Filter } from 'lucide-react'
-import { formatXOF, MONTH_NAMES, calculatePayroll } from '../lib/payroll'
+import { formatXOF, MONTH_NAMES, calculatePayroll, PayrollInput } from '../lib/payroll'
 import { generateBulletinPDF } from '../lib/pdf'
 
 export default function ExportPage() {
@@ -53,7 +53,22 @@ export default function ExportPage() {
       const period = periods.find(p => p.id === selectedPeriod)
       if (!vars || !period) return
       for (const v of vars) {
-        if (v.net_payable) await generateBulletinPDF({ employee: v, period, variables: v, result: v, orgName: '' })
+        const input: PayrollInput = {
+          base_salary: v.base_salary || 0,
+          overtime_premium: v.overtime_premium || v.sursalaire || 0,
+          function_allowance: v.function_allowance || v.indemnite_fonction || 0,
+          communication_allowance: v.communication_allowance || v.indemnite_communication || 0,
+          housing_premium: v.housing_premium || v.indemnite_logement || 0,
+          meal_premium: v.meal_premium || v.indemnite_repas || 0,
+          transport_allowance: v.transport_allowance || v.indemnite_transport || 0,
+          salary_advance: v.salary_advance || v.avance_salaire || 0,
+          loan_payment: v.loan_payment || v.remboursement_pret || 0,
+          flat_deduction: v.flat_deduction || v.deduction_forfaitaire || 0,
+          marital_status: v.marital_status || 'celibataire',
+          children_count: v.children_count || 0,
+        }
+        const result = calculatePayroll(input)
+        await generateBulletinPDF({ employee: v, period, variables: input, result, orgName: period.client_name || '' })
       }
     } catch {} finally { setExporting(false) }
   }

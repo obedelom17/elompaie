@@ -39,6 +39,7 @@ export default function ExportReports() {
   const [sPreavis, setSPreavis] = useState('0')
   const [sInclurePreavis, setSInclurePreavis] = useState(false)
   const [sRetenuesArr, setSRetenuesArr] = useState('0')
+  const [sRetenueSurSolde, setSRetenueSurSolde] = useState('0')
   const [sRegulIrpp, setSRegulIrpp] = useState('0')
   const [sJoursConges, setSJoursConges] = useState<{nb:string;label:string}[]>([{nb:'',label:''}])
   const [sTauxAuto, setSTauxAuto] = useState(true)
@@ -71,7 +72,7 @@ export default function ExportReports() {
       const blob = await res.blob()
       const a = document.createElement('a')
       a.href = URL.createObjectURL(blob); a.download = filename; a.click()
-      setMsg({ type:'success', text:'Fichier téléchargé ✓' })
+      setMsg({ type:'success', text:'Fichier téléchargé' })
     } catch (e: any) {
       setMsg({ type:'error', text: e.message })
     } finally { setLoading(false) }
@@ -85,12 +86,12 @@ export default function ExportReports() {
   const inputCls = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
   const labelCls = "block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1 uppercase tracking-wide"
 
-  const tabs: {key: Tab; label: string; emoji: string}[] = [
-    {key:'bulletin',  label:'Bulletin de paie',       emoji:'📄'},
-    {key:'etat',      label:'État des charges',        emoji:'📊'},
-    {key:'bordereau', label:'Bordereau CNSS/AMU',      emoji:'🏛️'},
-    {key:'irpp',      label:'Déclaration IRPP',        emoji:'💰'},
-    {key:'solde',     label:'Solde de tout compte',    emoji:'📋'},
+  const tabs: {key: Tab; label: string}[] = [
+    {key:'bulletin',  label:'Bulletin de paie'},
+    {key:'etat',      label:'État des charges'},
+    {key:'bordereau', label:'Bordereau CNSS/AMU'},
+    {key:'irpp',      label:'Déclaration IRPP'},
+    {key:'solde',     label:'Solde de tout compte'},
   ]
 
   return (
@@ -109,7 +110,7 @@ export default function ExportReports() {
         {tabs.map(t => (
           <button key={t.key} onClick={() => { setTab(t.key); setMsg(null) }}
             className={`flex-shrink-0 py-2 px-3 rounded-lg text-xs font-medium transition-all ${tab===t.key?'bg-white dark:bg-gray-700 text-blue-600 shadow':'text-gray-500 hover:text-gray-700 dark:text-gray-400'}`}>
-            {t.emoji} {t.label}
+            {t.label}
           </button>
         ))}
       </div>
@@ -163,7 +164,7 @@ export default function ExportReports() {
               await download('/api/export-bulletin',{period_id:bPeriod,employee_id:bEmployee},`Bulletin_${emp?.last_name||'employe'}_${lbl}.xlsx`)
             }
           }} disabled={loading} className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl transition">
-            {loading?'Génération…':'⬇ Télécharger Bulletin(s) .xlsx'}
+            {loading?'Génération…':'Télécharger Bulletin(s) .xlsx'}
           </button>
         </div>
       )}
@@ -191,7 +192,7 @@ export default function ExportReports() {
             const p=periods.find(p=>p.id===ePeriod)
             download('/api/export-etat-charges',{period_id:ePeriod,avec_regularisation:eRegul},`Etat_Charges_${getPeriodLabel(ePeriod)}${eRegul?'_regul':''}.xlsx`)
           }} disabled={loading} className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl transition">
-            {loading?'Génération…':'⬇ Télécharger État des charges .xlsx'}
+            {loading?'Génération…':'Télécharger État des charges .xlsx'}
           </button>
         </div>
       )}
@@ -214,7 +215,7 @@ export default function ExportReports() {
             if(!cPeriod) return setMsg({type:'error',text:'Sélectionne une période'})
             download('/api/export-bordereau-cnss',{period_id:cPeriod},`Bordereau_CNSS_AMU_${getPeriodLabel(cPeriod)}.xlsx`)
           }} disabled={loading} className="w-full bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl transition">
-            {loading?'Génération…':'⬇ Télécharger Bordereau CNSS/AMU .xlsx'}
+            {loading?'Génération…':'Télécharger Bordereau CNSS/AMU .xlsx'}
           </button>
         </div>
       )}
@@ -237,7 +238,7 @@ export default function ExportReports() {
             if(!iPeriod) return setMsg({type:'error',text:'Sélectionne une période'})
             download('/api/export-irpp',{period_id:iPeriod},`IRPP_${getPeriodLabel(iPeriod)}.xlsx`)
           }} disabled={loading} className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl transition">
-            {loading?'Génération…':'⬇ Télécharger Déclaration IRPP .xlsx'}
+            {loading?'Génération…':'Télécharger Déclaration IRPP .xlsx'}
           </button>
         </div>
       )}
@@ -299,6 +300,9 @@ export default function ExportReports() {
             <div><label className={labelCls}>Retenues arriérées (FCFA)</label><input type="number" className={inputCls} value={sRetenuesArr} onChange={e=>setSRetenuesArr(e.target.value)} /></div>
           </div>
           <div className="grid grid-cols-2 gap-4">
+            <div><label className={labelCls}>Retenue sur solde de tout compte (FCFA)</label><input type="number" className={inputCls} value={sRetenueSurSolde} onChange={e=>setSRetenueSurSolde(e.target.value)} /></div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
             <div><label className={labelCls}>Régularisation IRPP (FCFA)</label><input type="number" className={inputCls} value={sRegulIrpp} onChange={e=>setSRegulIrpp(e.target.value)} /></div>
             <div className="flex items-end pb-2">
               <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 cursor-pointer">
@@ -319,9 +323,10 @@ export default function ExportReports() {
               jours_conges_list:joursConges,taux_conges_auto:sTauxAuto,taux_conges_manuel:parseFloat(sTauxManuel)||0,
               avance:parseFloat(sAvance)||0,preavis:parseFloat(sPreavis)||0,inclure_preavis:sInclurePreavis,
               retenues_arrierees:parseFloat(sRetenuesArr)||0,regularisation_irpp:parseFloat(sRegulIrpp)||0,
+              retenue_sur_solde:parseFloat(sRetenueSurSolde)||0,
             },`Solde_${emp?.last_name||'employe'}_${sDateDepart}.xlsx`)
           }} disabled={loading} className="w-full bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl transition">
-            {loading?'Génération…':'⬇ Télécharger Solde de tout compte .xlsx'}
+            {loading?'Génération…':'Télécharger Solde de tout compte .xlsx'}
           </button>
         </div>
       )}

@@ -38,21 +38,6 @@ export function calcIrppMensuel(brut, persCharge = 0) {
   return Math.round(calcIrppAnnuel(imposable) / 12)
 }
 
-// Calcul IRPP annuel avec régularisation (cumul glissant)
-// irppVersesCumul = IRPP déjà versés pour les mois précédents de l'année
-export function calcIrppMensuelAvecRegul(brut, persCharge = 0, moisCourant = 1, irppVersesCumul = 0) {
-  const brutImposable = brut * (1 - 0.04 - 0.05)
-  const annuel = brutImposable * 12
-  const abattement = Math.min(annuel, 10_000_000) * 0.28
-  const chargesFamille = persCharge * 10_000 * 12
-  const imposable = Math.floor(Math.max(0, annuel - abattement - chargesFamille) / 1000) * 1000
-  const irppAnnuel = calcIrppAnnuel(imposable)
-  // IRPP théorique cumulé jusqu'au mois courant
-  const irppTheorique = Math.round(irppAnnuel * moisCourant / 12)
-  // IRPP du mois = théorique cumulé - déjà versé
-  return Math.max(0, irppTheorique - irppVersesCumul)
-}
-
 export function calcAnciete(hireDate, baseSalary, sursalaire) {
   if (!hireDate) return 0
   const mois = Math.floor((Date.now() - new Date(hireDate)) / (1000 * 60 * 60 * 24 * 30))
@@ -73,28 +58,4 @@ export function calcBrut(vars) {
 
 export function calcPersonnesCharge(maritalStatus, children) {
   return (maritalStatus === 'marie' ? 1 : 0) + (children || 0)
-}
-
-// Indemnité de licenciement Art. 97 Code du Travail 2021
-export function calcIndemniteLicenciement(salaireMoyenMensuel, anneesPresence) {
-  let indemnite = 0
-  for (let i = 1; i <= anneesPresence; i++) {
-    if (i <= 5) indemnite += salaireMoyenMensuel * 0.35
-    else if (i <= 10) indemnite += salaireMoyenMensuel * 0.40
-    else indemnite += salaireMoyenMensuel * 0.45
-  }
-  return Math.round(indemnite)
-}
-
-// Préavis Art. 74 Code du Travail 2021
-export function calcPreavis(category) {
-  const cat = (category || '').toLowerCase()
-  if (cat.includes('cadre') || cat.includes('chef') || cat.includes('directeur') || cat.includes('responsable')) return 3
-  if (cat.includes('maîtrise') || cat.includes('agent') || cat.includes('superviseur')) return 3
-  return 1 // ouvriers, employés
-}
-
-// Congés : 2,5 jours/mois (Art. 200)
-export function calcCongesPris(moisTravailles) {
-  return moisTravailles * 2.5
 }

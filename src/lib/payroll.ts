@@ -1,6 +1,5 @@
 // Moteur de calcul de paie - Togo
 
-
 export interface PayrollInput {
   base_salary: number
   overtime_hours?: number
@@ -190,7 +189,6 @@ export const MONTH_NAMES = [
   'Juillet','Août','Septembre','Octobre','Novembre','Décembre'
 ]
 
-
 // Les taux de majoration sont fixés par conventions collectives.
 // En l'absence de convention: +25% standard, +50% nuit/dimanche, +100% dimanche/férié de nuit
 // (pratique courante Togo en l'absence de convention collective applicable)
@@ -199,10 +197,6 @@ export const OT_RATES_LABEL = {
   h2: '+50% (nuit ou dimanche)',
   h3: '+100% (nuit dimanche/férié)',
 }
-
-// Enfants à charge jusqu'à 25 ans si études/apprentissage
-// L'employé doit déclarer cette situation — on garde children_count comme paramètre
-// et on affiche un avertissement dans l'UI si children_count > 0
 
 // ─── INDEMNITÉ MATERNITÉ ───────────────────────────────────────────────────
 // 14 semaines congé maternité. 50% à charge employeur, 50% CNSS.

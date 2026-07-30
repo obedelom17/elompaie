@@ -62,10 +62,10 @@ async function authMe(req, res) {
         WHERE up.user_id = ${session.user.id}
       `
       if (rows[0]?.organization_id) org = { id: rows[0].organization_id.toString(), name: rows[0].org_name }
-    } catch (e) { console.error('[authMe:db]', e.message) }
+    } catch { /* ignore */ }
     return res.status(200).json({ userId: session.user.id, email: session.user.email, org })
   } catch (e) {
-    console.error('[authMe]', e.message)
+    // silent
     return res.status(500).json({ error: e.message })
   }
 }
@@ -93,7 +93,7 @@ async function authRepairOrg(req, res) {
              ON CONFLICT (user_id) DO UPDATE SET organization_id = ${org.id}::uuid`
     return res.status(200).json({ ok: true, org })
   } catch (e) {
-    console.error('[authRepairOrg]', e.message)
+    // silent
     return res.status(500).json({ error: e.message })
   }
 }
@@ -1354,7 +1354,7 @@ export default async function handler(req, res) {
     return res.status(404).json({ error: `Route introuvable: ${path}` })
 
   } catch (e) {
-    console.error('[router]', path, e.message)
+    // silent — errors returned as JSON 500
     const is401 = e.message?.includes('auth') || e.message?.includes('authentif') ||
                   e.message?.includes('Session') || e.message?.includes('cookie')
     return res.status(is401 ? 401 : 500).json({ error: e.message })
@@ -1542,7 +1542,7 @@ async function handleExportBordereau(req, res, type) {
     nom: `${v.last_name} ${v.first_name}`,
     n_assure: v.social_security_number || '',
     brut: calcBrut(v),
-    brut_imposable: calcBrut(v),
+    brut_imposable: Math.round(calcBrut(v) * 0.91),
     irpp: calcIrppMensuel(calcBrut(v), calcPersonnesCharge(v.marital_status, v.children_count)),
     regularisation: v.regularisation_irpp || 0,
   }))

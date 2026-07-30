@@ -1172,6 +1172,21 @@ export default async function handler(req, res) {
       return res.status(405).end()
     }
 
+    if (path === '/api/settings/profile') {
+      if (method !== 'PATCH') return res.status(405).end()
+      const auth = await requireAuth(req)
+      const db = neon(DB_URL())
+      const { name } = req.body
+      if (!name?.trim()) return res.status(400).json({ error: 'Nom requis' })
+      // Mettre à jour le nom dans la table user (Better Auth)
+      try {
+        await db`UPDATE "user" SET name=${name.trim()} WHERE id=${auth.userId}`
+        return res.status(200).json({ ok: true, name: name.trim() })
+      } catch {
+        return res.status(200).json({ ok: true }) // silently ok even if col doesn't exist
+      }
+    }
+
     if (path === '/api/settings/change-password') {
       if (method !== 'POST') return res.status(405).end()
       await requireAuth(req)

@@ -166,444 +166,729 @@ function sc(ws, addr, val, font, align, border, numFmt) {
   if (numFmt) c.numFmt    = numFmt
 }
 
-// ─── BULLETIN DE PAIE ─────────────────────────────────────────────────────────
+// ─── BULLETIN DE PAIE (imitation parfaite DVV_2026.xlsx) ─────────────────────
 function genBulletin(wb, sheetName, data) {
   const ws = wb.addWorksheet(sheetName)
-  // Largeurs colonnes exactes du DVV original
-  ws.getColumn(1).width = 18.285
-  ws.getColumn(2).width = 35.0
-  ws.getColumn(3).width = 10.57
-  ws.getColumn(4).width = 8.855
-  ws.getColumn(5).width = 9.285
-  ws.getColumn(6).width = 11.425
+
+  // Largeurs colonnes identiques à l'original (A=Code B=Rubriques C=Base D=Taux E=Retenues F=Gains)
+  ws.getColumn(1).width = 6.0      // Code
+  ws.getColumn(2).width = 35.0     // Rubriques
+  ws.getColumn(3).width = 14.0     // Base
+  ws.getColumn(4).width = 9.0      // Taux/NB
+  ws.getColumn(5).width = 16.0     // Retenues
+  ws.getColumn(6).width = 16.0     // Gains
+
   ws.pageSetup.orientation = 'portrait'
-  ws.pageSetup.paperSize = 9
-  ws.pageSetup.fitToPage = true
-  ws.pageSetup.fitToWidth = 1
+  ws.pageSetup.paperSize   = 9
+  ws.pageSetup.fitToPage   = true
+  ws.pageSetup.fitToWidth  = 1
   ws.pageSetup.fitToHeight = 0
 
-  // ── HEADER : Logo + BULLETIN DE PAIE ──────────────────────────────────────
-  // Logo client (col A-B, lignes 1-9)
+  // ── Logo (col A-B, rows 1-9) ──────────────────────────────────────────────
   if (data.logoBuffer && data.logoBuffer.length > 4) {
     try {
       const b = data.logoBuffer
       let extension = 'png'
-      if (b[0] === 0xFF && b[1] === 0xD8) extension = 'jpeg'
-      else if (b[0] === 0x47 && b[1] === 0x49) extension = 'gif'
+      if (b[0]===0xFF && b[1]===0xD8) extension = 'jpeg'
       if (extension !== 'gif') {
         const imgId = wb.addImage({ buffer: data.logoBuffer, extension })
-        ws.addImage(imgId, { tl: { col: 0, row: 0 }, br: { col: 2, row: 9 } })
+        ws.addImage(imgId, { tl:{col:0,row:0}, br:{col:2,row:9} })
       }
     } catch {}
   }
 
-  // BULLETIN DE PAIE - box rouge (col C-F, rows 1-3)
+  // ── BULLETIN DE PAIE – box grise D9 centré (col C-F, rows 2-4) ──────────
   ws.mergeCells('C2:F4')
   const bpCell = ws.getCell('C2')
-  bpCell.value = 'BULLETIN DE PAIE'
-  bpCell.font = { name:'Calibri', size:18, bold:true, color:{argb:'FFC00000'} }
+  bpCell.value     = 'BULLETIN DE PAIE'
+  bpCell.font      = { name:'Calibri', size:18, bold:true, color:{argb:'FFC00000'} }
   bpCell.alignment = { horizontal:'center', vertical:'center' }
-  bpCell.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFD9D9D9'} }
+  bpCell.fill      = { type:'pattern', pattern:'solid', fgColor:{argb:'FFD9D9D9'} }
 
-  // Période - box blanc (col C-F, rows 6-9)
-  const m = data.mois_label || ''
-  const annee = data.period_year || ''
-  const moisNum = String(Number(data.period_month)||1).padStart(2,'0')
+  // ── Ligne rouge (row 5, col C-F) ─────────────────────────────────────────
+  ws.mergeCells('C5:F5')
+  ws.getCell('C5').fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFC00000'} }
+  ws.getRow(5).height = 6
+
+  // ── Période (col C-F, rows 6-9) ──────────────────────────────────────────
+  const moisLabel = data.mois_label || ''
+  const annee     = data.period_year || ''
+  const moisNum   = String(Number(data.period_month)||1).padStart(2,'0')
+  const lastDay   = (annee && data.period_month) ? new Date(Number(annee), Number(data.period_month), 0).getDate() : 30
   ws.mergeCells('C6:F9')
   const perCell = ws.getCell('C6')
-  const lastDay = annee && data.period_month ? new Date(Number(annee), Number(data.period_month), 0).getDate() : 30
   perCell.value = {
     richText: [
-      { font:{ name:'Calibri', size:12, bold:true }, text:`MOIS DE: ${m}` },
-      { font:{ name:'Calibri', size:12, bold:true }, text:`\nPERIODE DU:  01/${moisNum}/${annee}` },
-      { font:{ name:'Calibri', size:12, bold:true }, text:`\n                   AU:  ${lastDay}/${moisNum}/${annee}` },
+      { font:{name:'Calibri',size:12,bold:true}, text:`MOIS DE: ${moisLabel}` },
+      { font:{name:'Calibri',size:12,bold:true}, text:`\nPERIODE DU:  01/${moisNum}/${annee}` },
+      { font:{name:'Calibri',size:12,bold:true}, text:`\n                   AU:  ${lastDay}/${moisNum}/${annee}` },
     ]
   }
   perCell.alignment = { horizontal:'left', vertical:'top', wrapText:true }
-  perCell.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFF2F2F2'} }
-  perCell.border = { left:thin(), right:thin(), top:thin(), bottom:thin() }
+  perCell.fill      = { type:'pattern', pattern:'solid', fgColor:{argb:'FFF2F2F2'} }
+  perCell.border    = { left:thin(), right:thin(), top:thin(), bottom:thin() }
 
-  // Ligne rouge séparatrice (row 5, col C-F)
-  ws.mergeCells('C5:F5')
-  const sepCell = ws.getCell('C5')
-  sepCell.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFC00000'} }
-  ws.getRow(5).height = 6
-
-  // ── ENTITÉ - box bleu (rows 11-13) ────────────────────────────────────────
+  // ── Entité – box bleu foncé (row 11-13) ──────────────────────────────────
   ws.mergeCells('A11:F13')
   const entCell = ws.getCell('A11')
-  entCell.value = `Entité: ${data.client_name||''}
-${data.client_adresse||''}`
-  entCell.font = { name:'Calibri', size:14, bold:true, color:{argb:'FFFFFFFF'} }
+  entCell.value     = `Entité: ${data.client_name||''}\n${data.client_adresse||''}`
+  entCell.font      = { name:'Calibri', size:14, bold:true, color:{argb:'FFFFFFFF'} }
   entCell.alignment = { horizontal:'center', vertical:'middle', wrapText:true }
-  entCell.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FF1F3864'} }
-  entCell.border = { left:thin(), right:thin(), top:thin(), bottom:thin() }
+  entCell.fill      = { type:'pattern', pattern:'solid', fgColor:{argb:'FF1F3864'} }
+  entCell.border    = { left:thin(), right:thin(), top:thin(), bottom:thin() }
   ws.getRow(11).height = 20.25
 
-  // ── N° Employeur / NIF / TEL (rows 15-16) ─────────────────────────────────
+  // ── N° Employeur / NIF / TEL (rows 15-16) ────────────────────────────────
   ws.mergeCells('A15:F16')
   const numCell = ws.getCell('A15')
-  numCell.value = `N° Employeur : ${data.num_employeur||''}      NIF : ${data.nif||''}
-TEL: ${data.telephone_client||''}`
-  numCell.font = { name:'Calibri', size:14, bold:true, color:{argb:'FFFFFFFF'} }
+  numCell.value     = `N° Employeur : ${data.num_employeur||''}      NIF : ${data.nif||''}\nTEL: ${data.telephone_client||''}`
+  numCell.font      = { name:'Calibri', size:14, bold:true, color:{argb:'FFFFFFFF'} }
   numCell.alignment = { horizontal:'center', vertical:'middle', wrapText:true }
-  numCell.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FF1F3864'} }
-  numCell.border = { left:thin(), right:thin(), top:thin(), bottom:thin() }
+  numCell.fill      = { type:'pattern', pattern:'solid', fgColor:{argb:'FF1F3864'} }
+  numCell.border    = { left:thin(), right:thin(), top:thin(), bottom:thin() }
 
-  // ── Infos employé (rows 18-25) ─────────────────────────────────────────────
+  // ── Infos employé (rows 18-25) exactement comme l'original ───────────────
   const infos = [
-    ['A18', ' Nom & Prénoms : ',   'B18', data.nom,              true ],
-    ['A19', 'N°Assuré :',          'B19', data.n_assure,         false],
-    ['A20', 'NIF:',                'B20', data.nif_employe,      false],
-    ['A21', 'Direction/section:',  'B21', data.direction,        true ],
-    ['A22', 'Poste/Fonction: ',    'B22', data.poste,            true ],
-    ['A23', 'Téléphone:',          'B23', data.telephone,        true ],
-    ['A24', " Date d'embauche: ",  'B24', data.date_embauche,    false],
-    ['A25', ' Pers à charge ',     'B25', data.personnes_charge, false],
+    ['A18'," Nom & Prénoms : ",'B18', data.nom,              true ],
+    ['A19','N°Assuré :',       'B19', data.n_assure,         false],
+    ['A20','NIF:',             'B20', data.nif_employe,      false],
+    ['A21','Direction/section:','B21',data.direction,        true ],
+    ['A22','Poste/Fonction: ', 'B22', data.poste,            true ],
+    ['A23','Téléphone:',       'B23', data.telephone,        true ],
+    ['A24'," Date d'embauche: ",'B24',data.date_embauche,   false],
+    ['A25',' Pers à charge ',  'B25', data.personnes_charge, false],
   ]
   for (const [ca, la, cb, vb, bold] of infos) {
-    sc(ws, ca, la, cg(10,true),  aln('right'),  { left: dbl() })
-    sc(ws, cb, vb, cg(10, bold), aln('left'),   null)
+    sc(ws, ca, la, { name:'Calibri', size:10, bold:true }, { horizontal:'right' }, { left:dbl() })
+    sc(ws, cb, vb, { name:'Calibri', size:10, bold }, { horizontal:'left' })
   }
+  ws.getRow(18).height = 14.25
 
-  // ── En-têtes tableau (row 26) ──────────────────────────────────────────────
-  const hCols   = ['A','B','C','D','E','F']
-  const hLabels  = ['Code','Rubriques','Base','Taux/NB','Retenues','Gains']
-  const hFill    = { type:'pattern', pattern:'solid', fgColor:{argb:'FFD9E1F2'} }
+  // ── En-têtes tableau (row 26) exactement comme l'original ────────────────
+  const hLabels = ['Code','Rubriques','Base','Taux/NB','Retenues','Gains']
+  const hFill   = { type:'pattern', pattern:'solid', fgColor:{argb:'FFD9E1F2'} }
   for (let i=0; i<6; i++) {
-    const cell = ws.getCell(`${hCols[i]}26`)
+    const col  = String.fromCharCode(65+i)
+    const cell = ws.getCell(`${col}26`)
     cell.value     = hLabels[i]
-    cell.font      = cg(10,true)
-    cell.alignment = aln('center')
+    cell.font      = { name:'Calibri', size:10, bold:true }
+    cell.alignment = { horizontal:'center', vertical:'middle' }
     cell.fill      = hFill
-    cell.border    = i===0
-      ? { left:dbl(), right:thin(), top:thin(), bottom:thin() }
-      : i===5
-        ? { left:thin(), right:dbl(), top:thin(), bottom:thin() }
-        : { left:thin(), right:thin(), top:thin(), bottom:thin() }
+    cell.border    = {
+      left:  i===0 ? dbl() : thin(),
+      right: i===5 ? dbl() : thin(),
+      top:thin(), bottom:thin()
+    }
   }
+  ws.getRow(26).height = 18
 
-  // Rubriques dynamiques
+  // ── Rubriques dynamiques ──────────────────────────────────────────────────
   let row = 27
   const gainsRows = []
   for (const rub of (data.rubriques || [])) {
-    sc(ws, `B${row}`, rub.label, cg(10,false), aln(null,'center'), { left: thin() })
-    if (rub.base   != null) { ws.getCell(`C${row}`).value=rub.base;        ws.getCell(`C${row}`).numFmt='#,##0'; ws.getCell(`C${row}`).border={left:thin()} }
-    if (rub.taux_ou_nb != null) { ws.getCell(`D${row}`).value=rub.taux_ou_nb; ws.getCell(`D${row}`).border={left:thin()} }
-    ws.getCell(`F${row}`).value   = { formula: `C${row}` }
-    ws.getCell(`F${row}`).numFmt  = '#,##0'
-    ws.getCell(`F${row}`).border  = { left: thin() }
+    // Code
+    ws.getCell(`A${row}`).border = { left:dbl(), right:thin() }
+    // Rubrique
+    sc(ws, `B${row}`, rub.label, { name:'Calibri', size:10, bold:false }, { horizontal:'left', vertical:'center' }, { left:thin() })
+    // Base
+    if (rub.base != null) {
+      ws.getCell(`C${row}`).value  = rub.base
+      ws.getCell(`C${row}`).numFmt = '#,##0'
+      ws.getCell(`C${row}`).border = { left:thin() }
+      ws.getCell(`C${row}`).font   = { name:'Calibri', size:10 }
+    }
+    // Taux/NB = 30 comme l'original
+    ws.getCell(`D${row}`).value  = rub.taux_ou_nb != null ? rub.taux_ou_nb : 30
+    ws.getCell(`D${row}`).border = { left:thin() }
+    ws.getCell(`D${row}`).font   = { name:'Calibri', size:10 }
+    // Retenues (vide pour gains)
+    ws.getCell(`E${row}`).border = { left:thin() }
+    // Gains = base (formule)
+    ws.getCell(`F${row}`).value  = { formula:`C${row}` }
+    ws.getCell(`F${row}`).numFmt = '#,##0'
+    ws.getCell(`F${row}`).border = { left:thin(), right:dbl() }
+    ws.getCell(`F${row}`).font   = { name:'Calibri', size:10 }
     gainsRows.push(row)
     row++
   }
-  // 2 lignes variables vides
+
+  // 2 lignes vides avec D=30 (comme l'original)
   for (let i=0; i<2; i++) {
+    ws.getCell(`A${row}`).border = { left:dbl(), right:thin() }
+    ws.getCell(`B${row}`).border = { left:thin() }
+    ws.getCell(`C${row}`).border = { left:thin() }
     ws.getCell(`D${row}`).value  = 30
-    ws.getCell(`D${row}`).border = { left: thin() }
-    ws.getCell(`F${row}`).value  = { formula: `IF(ISNUMBER(C${row}),C${row}*D${row}/30,0)` }
+    ws.getCell(`D${row}`).border = { left:thin() }
+    ws.getCell(`D${row}`).font   = { name:'Calibri', size:10 }
+    ws.getCell(`E${row}`).border = { left:thin() }
+    ws.getCell(`F${row}`).value  = 0
     ws.getCell(`F${row}`).numFmt = '#,##0'
-    ws.getCell(`F${row}`).border = { left: thin() }
+    ws.getCell(`F${row}`).border = { left:thin(), right:dbl() }
     row++
   }
 
-  // Salaire brut
+  // ── Salaire brut ─────────────────────────────────────────────────────────
   const brutRow = row
-  sc(ws, `B${brutRow}`, 'Salaire brut ', cg(10,true), aln(null,'center'), { left: thin() })
-  ws.getCell(`F${brutRow}`).value  = { formula: `IFERROR(${gainsRows.map(r=>`F${r}`).join('+')},0)` }
-  ws.getCell(`F${brutRow}`).font   = cg(10,true)
+  ws.getCell(`A${brutRow}`).border = { left:dbl(), right:thin() }
+  sc(ws, `B${brutRow}`, 'Salaire brut ', { name:'Calibri', size:10, bold:true }, { horizontal:'left' }, { left:thin() })
+  ws.getCell(`C${brutRow}`).border = { left:thin() }
+  ws.getCell(`D${brutRow}`).border = { left:thin() }
+  ws.getCell(`E${brutRow}`).border = { left:thin() }
+  const gainsFormula = gainsRows.length ? gainsRows.map(r=>`F${r}`).join('+') : '0'
+  ws.getCell(`F${brutRow}`).value  = { formula: `IFERROR(${gainsFormula},0)` }
+  ws.getCell(`F${brutRow}`).font   = { name:'Calibri', size:10, bold:true }
   ws.getCell(`F${brutRow}`).numFmt = '#,##0'
-  ws.getCell(`F${brutRow}`).border = { left: thin() }
+  ws.getCell(`F${brutRow}`).border = { left:thin(), right:dbl() }
   row++
 
-  // CNSS
+  // ── CNSS ─────────────────────────────────────────────────────────────────
   const cnssRow = row
-  sc(ws, `B${row}`, 'CNSS ', cg(10,false), null, { left: thin() })
-  ws.getCell(`C${row}`).value={formula:`F${brutRow}`}; ws.getCell(`C${row}`).numFmt='#,##0'; ws.getCell(`C${row}`).border={left:thin()}
-  ws.getCell(`D${row}`).value=0.04; ws.getCell(`D${row}`).numFmt='0%'; ws.getCell(`D${row}`).border={left:thin()}
-  ws.getCell(`E${row}`).value={formula:`C${row}*D${row}`}; ws.getCell(`E${row}`).numFmt='#,##0'; ws.getCell(`E${row}`).border={left:thin()}
+  ws.getCell(`A${row}`).border = { left:dbl(), right:thin() }
+  sc(ws, `B${row}`, 'CNSS ', { name:'Calibri', size:10, bold:false }, { horizontal:'left' }, { left:thin() })
+  ws.getCell(`C${row}`).value  = { formula:`F${brutRow}` }
+  ws.getCell(`C${row}`).numFmt = '#,##0'
+  ws.getCell(`C${row}`).border = { left:thin() }
+  ws.getCell(`D${row}`).value  = 0.04
+  ws.getCell(`D${row}`).numFmt = '0%'
+  ws.getCell(`D${row}`).border = { left:thin() }
+  ws.getCell(`E${row}`).value  = { formula:`C${row}*D${row}` }
+  ws.getCell(`E${row}`).numFmt = '#,##0'
+  ws.getCell(`E${row}`).border = { left:thin() }
+  ws.getCell(`F${row}`).border = { left:thin(), right:dbl() }
   row++
 
-  // AMU
+  // ── AMU ──────────────────────────────────────────────────────────────────
   const amuRow = row
-  sc(ws, `B${row}`, 'AMU', cg(10,false), null, { left: thin() })
-  ws.getCell(`C${row}`).value={formula:`F${brutRow}`}; ws.getCell(`C${row}`).numFmt='#,##0'; ws.getCell(`C${row}`).border={left:thin()}
-  ws.getCell(`D${row}`).value=0.05; ws.getCell(`D${row}`).numFmt='0%'; ws.getCell(`D${row}`).border={left:thin()}
-  ws.getCell(`E${row}`).value={formula:`C${row}*D${row}`}; ws.getCell(`E${row}`).numFmt='#,##0'; ws.getCell(`E${row}`).border={left:thin()}
+  ws.getCell(`A${row}`).border = { left:dbl(), right:thin() }
+  sc(ws, `B${row}`, 'AMU', { name:'Calibri', size:10, bold:false }, { horizontal:'left' }, { left:thin() })
+  ws.getCell(`C${row}`).value  = { formula:`F${brutRow}` }
+  ws.getCell(`C${row}`).numFmt = '#,##0'
+  ws.getCell(`C${row}`).border = { left:thin() }
+  ws.getCell(`D${row}`).value  = 0.05
+  ws.getCell(`D${row}`).numFmt = '0%'
+  ws.getCell(`D${row}`).border = { left:thin() }
+  ws.getCell(`E${row}`).value  = { formula:`C${row}*D${row}` }
+  ws.getCell(`E${row}`).numFmt = '#,##0'
+  ws.getCell(`E${row}`).border = { left:thin() }
+  ws.getCell(`F${row}`).border = { left:thin(), right:dbl() }
   row++
 
-  // IRPP
+  // ── IRPP ─────────────────────────────────────────────────────────────────
   const irppRow = row
-  sc(ws, `B${row}`, 'IRPP ', cg(10,false), null, { left: thin() })
-  ws.getCell(`C${row}`).value=data.irpp_base||''; ws.getCell(`C${row}`).numFmt='#,##0'; ws.getCell(`C${row}`).border={left:thin()}
-  ws.getCell(`E${row}`).value=data.irpp||0;       ws.getCell(`E${row}`).numFmt='#,##0'; ws.getCell(`E${row}`).border={left:thin()}
+  ws.getCell(`A${row}`).border = { left:dbl(), right:thin() }
+  sc(ws, `B${row}`, 'IRPP ', { name:'Calibri', size:10, bold:false }, { horizontal:'left' }, { left:thin() })
+  // Base IRPP = brut_imposable (F*0.91 arrondi à 1000)
+  ws.getCell(`C${row}`).value  = data.irpp_base || { formula:`FLOOR(F${brutRow}*0.91,1000)` }
+  ws.getCell(`C${row}`).numFmt = '#,##0'
+  ws.getCell(`C${row}`).border = { left:thin() }
+  ws.getCell(`D${row}`).value  = 0
+  ws.getCell(`D${row}`).border = { left:thin() }
+  ws.getCell(`E${row}`).value  = data.irpp || 0
+  ws.getCell(`E${row}`).numFmt = '#,##0'
+  ws.getCell(`E${row}`).border = { left:thin() }
+  ws.getCell(`F${row}`).border = { left:thin(), right:dbl() }
   row++
 
-  // Total retenues légales
+  // ── Total Retenues Légales ────────────────────────────────────────────────
   const totRetRow = row
-  sc(ws, `B${row}`, 'Total Retenues Légales', cg(10,true), null, { left: med() })
-  ws.getCell(`E${row}`).value={formula:`E${cnssRow}+E${amuRow}+E${irppRow}`}; ws.getCell(`E${row}`).font=cg(10,true); ws.getCell(`E${row}`).numFmt='#,##0'; ws.getCell(`E${row}`).border={left:thin()}
+  const totFill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFD9D9D9'} }
+  ws.getCell(`A${row}`).border = { left:dbl(), right:thin() }
+  sc(ws, `B${row}`, 'Total Retenues Légales', { name:'Calibri', size:10, bold:true }, { horizontal:'left' }, { left:thin() })
+  ws.getCell(`B${row}`).fill  = totFill
+  ws.getCell(`C${row}`).border = { left:thin() }; ws.getCell(`C${row}`).fill=totFill
+  ws.getCell(`D${row}`).border = { left:thin() }; ws.getCell(`D${row}`).fill=totFill
+  ws.getCell(`E${row}`).value  = { formula:`E${cnssRow}+E${amuRow}+E${irppRow}` }
+  ws.getCell(`E${row}`).font   = { name:'Calibri', size:10, bold:true }
+  ws.getCell(`E${row}`).numFmt = '#,##0'
+  ws.getCell(`E${row}`).border = { left:thin(), top:thin(), bottom:thin() }
+  ws.getCell(`E${row}`).fill   = totFill
+  ws.getCell(`F${row}`).border = { left:thin(), right:dbl() }; ws.getCell(`F${row}`).fill=totFill
   row++
 
-  // Salaire net légal
+  // ── Salaire Net légal ─────────────────────────────────────────────────────
   const netLegalRow = row
-  sc(ws, `B${row}`, 'Salaire Net (après Retenues Légales)', cg(10,true), null, { left: thin() })
-  ws.getCell(`F${row}`).value={formula:`F${brutRow}-E${totRetRow}`}; ws.getCell(`F${row}`).font=cg(10,true); ws.getCell(`F${row}`).numFmt='#,##0'; ws.getCell(`F${row}`).border={left:thin()}
+  ws.getCell(`A${row}`).border = { left:dbl(), right:thin() }
+  sc(ws, `B${row}`, 'Salaire Net (après Retenues Légales)', { name:'Calibri', size:10, bold:true }, { horizontal:'left' }, { left:thin() })
+  ws.getCell(`C${row}`).border = { left:thin() }
+  ws.getCell(`D${row}`).border = { left:thin() }
+  ws.getCell(`E${row}`).border = { left:thin() }
+  ws.getCell(`F${row}`).value  = { formula:`F${brutRow}-E${totRetRow}` }
+  ws.getCell(`F${row}`).font   = { name:'Calibri', size:10, bold:true }
+  ws.getCell(`F${row}`).numFmt = '#,##0'
+  ws.getCell(`F${row}`).border = { left:thin(), right:dbl() }
   row++
 
-  // Avance
+  // ── Retenue avance ────────────────────────────────────────────────────────
   const avRow = row
-  sc(ws, `B${row}`, 'Retenue avance sur salaire', cg(10,false), null, { left: thin() })
-  ws.getCell(`E${row}`).value=data.avance_salaire||0; ws.getCell(`E${row}`).numFmt='#,##0'; ws.getCell(`E${row}`).border={left:thin()}
+  ws.getCell(`A${row}`).border = { left:dbl(), right:thin() }
+  sc(ws, `B${row}`, 'Retenue avance sur salaire', { name:'Calibri', size:10, bold:false }, { horizontal:'left' }, { left:thin() })
+  ws.getCell(`C${row}`).border = { left:thin() }
+  ws.getCell(`D${row}`).border = { left:thin() }
+  ws.getCell(`E${row}`).value  = data.avance_salaire || 0
+  ws.getCell(`E${row}`).numFmt = '#,##0'
+  ws.getCell(`E${row}`).border = { left:thin() }
+  ws.getCell(`F${row}`).border = { left:thin(), right:dbl() }
   row++
 
-  // Total autres retenues
+  // ── Total Autres Retenues ─────────────────────────────────────────────────
   const autRow = row
-  sc(ws, `B${row}`, 'Total Autres retenues', cg(10,true), null, { left: thin() })
-  ws.getCell(`E${row}`).value={formula:`SUM(E${avRow}:E${avRow})`}; ws.getCell(`E${row}`).font=cg(10,true); ws.getCell(`E${row}`).numFmt='#,##0'; ws.getCell(`E${row}`).border={left:thin()}
+  ws.getCell(`A${row}`).border = { left:dbl(), right:thin() }
+  ws.getCell(`A${row}`).fill   = totFill
+  sc(ws, `B${row}`, 'Total Autres retenues', { name:'Calibri', size:10, bold:true }, { horizontal:'left' }, { left:thin() })
+  ws.getCell(`B${row}`).fill   = totFill
+  ws.getCell(`C${row}`).border = { left:thin() }; ws.getCell(`C${row}`).fill=totFill
+  ws.getCell(`D${row}`).border = { left:thin() }; ws.getCell(`D${row}`).fill=totFill
+  ws.getCell(`E${row}`).value  = { formula:`E${avRow}` }
+  ws.getCell(`E${row}`).font   = { name:'Calibri', size:10, bold:true }
+  ws.getCell(`E${row}`).numFmt = '#,##0'
+  ws.getCell(`E${row}`).border = { left:thin() }
+  ws.getCell(`E${row}`).fill   = totFill
+  ws.getCell(`F${row}`).border = { left:thin(), right:dbl() }; ws.getCell(`F${row}`).fill=totFill
   row++
 
-  // NET A PAYER
+  // ── NET A PAYER ───────────────────────────────────────────────────────────
+  const netRow = row
   ws.mergeCells(`A${row}:E${row}`)
-  sc(ws, `A${row}`, 'NET A PAYER ', cg(12,true), aln('center'), { left:dbl(), right:thin(), top:thin(), bottom:thin() })
-  ws.getCell(`F${row}`).value={formula:`F${netLegalRow}-E${autRow}`}; ws.getCell(`F${row}`).font=cg(12,true); ws.getCell(`F${row}`).numFmt='#,##0'; ws.getCell(`F${row}`).border={left:thin()}
+  ws.getCell(`A${row}`).value     = 'NET A PAYER '
+  ws.getCell(`A${row}`).font      = { name:'Calibri', size:12, bold:true }
+  ws.getCell(`A${row}`).alignment = { horizontal:'center', vertical:'middle' }
+  ws.getCell(`A${row}`).border    = { left:dbl(), right:thin(), top:thin(), bottom:dbl() }
+  ws.getCell(`A${row}`).fill      = { type:'pattern', pattern:'solid', fgColor:{argb:'FFD9E1F2'} }
+  ws.getCell(`F${row}`).value     = { formula:`F${netLegalRow}-E${autRow}` }
+  ws.getCell(`F${row}`).font      = { name:'Calibri', size:12, bold:true }
+  ws.getCell(`F${row}`).numFmt    = '#,##0'
+  ws.getCell(`F${row}`).border    = { left:thin(), right:dbl(), top:thin(), bottom:dbl() }
+  ws.getCell(`F${row}`).fill      = { type:'pattern', pattern:'solid', fgColor:{argb:'FFD9E1F2'} }
+  ws.getRow(row).height = 22
   row += 2
 
-  // Charges patronales
+  // ── Charges patronales (bas du bulletin, identique à l'original) ──────────
   const patRow = row
   ws.getRow(row).height = 25.5
-  sc(ws, `A${row}`, "Signature et Cachet de l'employeur", bos(10,true), aln(null,'center'))
-  sc(ws, `E${row}`, 'Charges Patronales',  cg(8,true,true), aln(null,'center'), { left: med() })
-  ws.getCell(`F${row}`).value={formula:`F${brutRow}*17.5%`}; ws.getCell(`F${row}`).font=cg(10,true); ws.getCell(`F${row}`).alignment=aln('center'); ws.getCell(`F${row}`).numFmt='#,##0'; ws.getCell(`F${row}`).border={left:med()}
+  sc(ws, `A${row}`, "Signature et Cachet de l'employeur", { name:'Calibri', size:10, bold:true }, { horizontal:'left', vertical:'center' })
+  sc(ws, `E${row}`, 'Charges Patronales', { name:'Calibri', size:8, bold:true, italic:true }, { horizontal:'center', vertical:'center' }, { left:med() })
+  ws.getCell(`F${row}`).value     = { formula:`F${brutRow}*17.5%` }
+  ws.getCell(`F${row}`).font      = { name:'Calibri', size:10, bold:true }
+  ws.getCell(`F${row}`).alignment = { horizontal:'center' }
+  ws.getCell(`F${row}`).numFmt    = '#,##0'
+  ws.getCell(`F${row}`).border    = { left:med() }
   row++
 
   ws.getRow(row).height = 25.5
-  sc(ws, `E${row}`, 'AMU Part Patronale', cg(8,true,true), aln(null,'center'), { left: med() })
-  ws.getCell(`F${row}`).value={formula:`E${amuRow}`}; ws.getCell(`F${row}`).font=cg(10,true); ws.getCell(`F${row}`).alignment=aln('center'); ws.getCell(`F${row}`).numFmt='#,##0'
+  sc(ws, `E${row}`, 'AMU Part Patronale', { name:'Calibri', size:8, bold:true, italic:true }, { horizontal:'center', vertical:'center' }, { left:med() })
+  ws.getCell(`F${row}`).value     = { formula:`E${amuRow}` }
+  ws.getCell(`F${row}`).font      = { name:'Calibri', size:10, bold:true }
+  ws.getCell(`F${row}`).alignment = { horizontal:'center' }
+  ws.getCell(`F${row}`).numFmt    = '#,##0'
   row++
 
   ws.getRow(row).height = 25.5
-  sc(ws, `E${row}`, 'Masse Salariale', cg(8,true,true), aln(null,'center'), { left: med() })
-  ws.getCell(`F${row}`).value={formula:`F${brutRow}+F${patRow}+E${amuRow}`}; ws.getCell(`F${row}`).font=cg(9,true); ws.getCell(`F${row}`).alignment=aln('center'); ws.getCell(`F${row}`).numFmt='#,##0'
+  sc(ws, `E${row}`, 'Masse Salariale', { name:'Calibri', size:8, bold:true, italic:true }, { horizontal:'center', vertical:'center' }, { left:med() })
+  ws.getCell(`F${row}`).value     = { formula:`F${brutRow}+F${patRow}+E${amuRow}` }
+  ws.getCell(`F${row}`).font      = { name:'Calibri', size:9, bold:true }
+  ws.getCell(`F${row}`).alignment = { horizontal:'center' }
+  ws.getCell(`F${row}`).numFmt    = '#,##0'
   row++
 
-  sc(ws, `D${row}`, "Signature de l'employé(e) ", cg(10,true), aln(null,'center'))
+  sc(ws, `D${row}`, "Signature de l'employé(e) ", { name:'Calibri', size:10, bold:true }, { horizontal:'center', vertical:'center' })
 }
 
-// ─── ÉTAT DES CHARGES ─────────────────────────────────────────────────────────
+// ─── ÉTAT DES CHARGES (imitation parfaite Etat_des_charges.xlsx) ──────────────
 function genEtatCharges(wb, sheetName, title, employes, avecRegul) {
   const ws = wb.addWorksheet(sheetName)
-  const nCols = avecRegul ? 16 : 14
+  const nCols  = avecRegul ? 16 : 14
   const lastCol = avecRegul ? 'P' : 'N'
-  const widths = [3.86,53.43,20,41.57,16.86,15.57,23.29,16.71,16.57,23,19.57,13.14,28,15.57,20,15.57]
-  for (let i=0; i<nCols; i++) ws.getColumn(i+1).width = widths[i]
 
+  // Largeurs identiques à l'original
+  const widths = [4.14, 72.57, 20, 42, 17.71, 15.57, 26, 19, 18.86, 26, 22.29, 14.86, 31.86, 15.57, 20, 15.57]
+  for (let i = 0; i < nCols; i++) ws.getColumn(i+1).width = widths[i]
+
+  // ── Titre ligne 1 ─────────────────────────────────────────────────────────
   ws.mergeCells(`A1:${lastCol}1`)
-  ws.getRow(1).height = 30
+  ws.getRow(1).height = 36
   const t = ws.getCell('A1')
-  t.value = title; t.font = cal(20,true); t.alignment = aln('center')
+  t.value     = title
+  t.font      = { name:'Calibri', size:20, bold:false }
+  t.alignment = { horizontal:'center', vertical:'middle', wrapText:true }
 
+  // ── Headers ligne 2 ───────────────────────────────────────────────────────
   const headers = avecRegul
     ? ['N°','Nom et Prénoms','Responsable','Poste','Pole','Salaire brut','Salaire brut imposable','CNSS Salarié 4%','AMU Salarié 5%','CNSS Patronale 17,5%','AMU Patronale 5%','IRPP Salarié','REGULARISATION IRPP','IRPP A PAYER','TOTAL RETENUES SALARIES','NET A PAYER']
     : ['N°','Nom et Prénoms','Responsable','Poste','Pole','Salaire brut','Salaire brut imposable','CNSS Salarié 4%','AMU Salarié 5%','CNSS Patronale 17,5%','AMU Patronale 5%','IRPP Salarié','TOTAL RETENUES SALARIES','NET A PAYER']
 
+  const headerFill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFD9E1F2'} }
   for (let ci=1; ci<=headers.length; ci++) {
     const c = ws.getRow(2).getCell(ci)
-    c.value = headers[ci-1]; c.font = cal(12,true)
-    c.alignment = { horizontal:'center', wrapText:true }
-    c.border = { left:thin(), right:thin(), top:thin(), bottom:thin() }
+    c.value     = headers[ci-1]
+    c.font      = { name:'Calibri', size:14, bold:false }
+    c.alignment = { horizontal:'center', vertical:'middle', wrapText:true }
+    c.fill      = headerFill
+    c.border    = { left:thin(), right:thin(), top:thin(), bottom:thin() }
   }
-  ws.getRow(2).height = 40
+  ws.getRow(2).height = 50
 
+  // ── Lignes employés ───────────────────────────────────────────────────────
   for (let i=0; i<employes.length; i++) {
-    const r = i+3; const emp = employes[i]
+    const r   = i+3
+    const emp = employes[i]
+    const rowFill = i%2===1 ? { type:'pattern', pattern:'solid', fgColor:{argb:'FFF2F2F2'} } : null
+
+    // Colonnes texte A-E
+    const textes = [i+1, emp.nom, emp.responsable||'', emp.poste||'', emp.pole||'']
+    const txSizes = [14,15,15,12,12]
     for (let ci=1; ci<=5; ci++) {
       const c = ws.getRow(r).getCell(ci)
-      c.value = [i+1, emp.nom, emp.responsable, emp.poste, emp.pole][ci-1]
-      c.font = cal(11,false)
+      c.value     = textes[ci-1]
+      c.font      = { name:'Calibri', size:txSizes[ci-1], bold:false }
+      c.alignment = { horizontal: ci===1?'center':'left', vertical:'middle', wrapText:ci===2||ci===3 }
+      c.border    = { left:thin(), right:thin(), top:thin(), bottom:thin() }
+      if (rowFill) c.fill = rowFill
     }
+
+    // Colonnes numériques: formules identiques à l'original
+    // F=brut (N+M ou P+O), G=brut imposable, H=G*4%, I=G*5%, J=G*17.5%, K=G*5%, L=IRPP
+    // sans régul: M=H+I+L, N=net_payer
+    // avec régul: M=IRPP_salarié, N=regul, O=L+M (IRPP à payer), P=H+I+O, Q=net_payer → décalé
     const vals = avecRegul
-      ? [[6,{formula:`P${r}+O${r}`}],[7,emp.brut_imposable],[8,{formula:`G${r}*4%`}],[9,{formula:`G${r}*5%`}],[10,{formula:`G${r}*17.5%`}],[11,{formula:`G${r}*5%`}],[12,emp.irpp],[13,emp.regularisation_irpp||0],[14,{formula:`L${r}+M${r}`}],[15,{formula:`H${r}+I${r}+N${r}`}],[16,emp.net_payer]]
-      : [[6,{formula:`N${r}+M${r}`}],[7,emp.brut_imposable],[8,{formula:`G${r}*4%`}],[9,{formula:`G${r}*5%`}],[10,{formula:`G${r}*17.5%`}],[11,{formula:`G${r}*5%`}],[12,emp.irpp],[13,{formula:`H${r}+I${r}+L${r}`}],[14,emp.net_payer]]
+      ? [
+          [6,  {formula:`P${r}+O${r}`}],
+          [7,  emp.brut_imposable],
+          [8,  {formula:`G${r}*4%`}],
+          [9,  {formula:`G${r}*5%`}],
+          [10, {formula:`G${r}*17.5%`}],
+          [11, {formula:`G${r}*5%`}],
+          [12, emp.irpp],
+          [13, emp.regularisation_irpp || 0],
+          [14, {formula:`L${r}+M${r}`}],
+          [15, {formula:`H${r}+I${r}+N${r}`}],
+          [16, emp.net_payer],
+        ]
+      : [
+          [6,  {formula:`N${r}+M${r}`}],
+          [7,  emp.brut_imposable],
+          [8,  {formula:`G${r}*4%`}],
+          [9,  {formula:`G${r}*5%`}],
+          [10, {formula:`G${r}*17.5%`}],
+          [11, {formula:`G${r}*5%`}],
+          [12, emp.irpp],
+          [13, {formula:`H${r}+I${r}+L${r}`}],
+          [14, emp.net_payer],
+        ]
+
     for (const [ci, val] of vals) {
       const c = ws.getRow(r).getCell(ci)
-      c.value = val; c.font = cal(ci===nCols?12:11,false); c.numFmt = '#,##0'
+      c.value     = val
+      c.font      = { name:'Calibri', size:14, bold:false }
+      c.alignment = { horizontal:'right', vertical:'middle' }
+      c.numFmt    = '#,##0'
+      c.border    = { left:thin(), right:thin(), top:thin(), bottom:thin() }
+      if (rowFill) c.fill = rowFill
     }
+    ws.getRow(r).height = 22
   }
 
-  const tr = employes.length+3; const e = tr-1
-  ws.getRow(tr).getCell(2).value = 'TOTAL'
-  ws.getRow(tr).getCell(2).font  = cal(12,true)
+  // ── Ligne TOTAL ───────────────────────────────────────────────────────────
+  const tr    = employes.length + 3
+  const lastR = tr - 1
+  const totalFill = { type:'pattern', pattern:'solid', fgColor:{argb:'FF1F3864'} }
+  const totalFont = { name:'Calibri', size:13, bold:true, color:{argb:'FFFFFFFF'} }
+
+  ws.getRow(tr).getCell(2).value     = 'TOTAL'
+  ws.getRow(tr).getCell(2).font      = totalFont
+  ws.getRow(tr).getCell(2).fill      = totalFill
+  ws.getRow(tr).getCell(2).alignment = { horizontal:'center', vertical:'middle' }
+  ws.getRow(tr).height = 24
+
   for (let ci=6; ci<=nCols; ci++) {
-    const lc = String.fromCharCode(64+ci)
-    const c = ws.getRow(tr).getCell(ci)
-    c.value  = { formula: `SUM(${lc}3:${lc}${e})` }
-    c.font   = cal(12,true)
-    c.border = { left:thin(), right:thin(), top:thin(), bottom:thin() }
-    c.numFmt = '#,##0'
+    const lc   = String.fromCharCode(64+ci)
+    const c    = ws.getRow(tr).getCell(ci)
+    c.value    = { formula:`SUM(${lc}3:${lc}${lastR})` }
+    c.font     = totalFont
+    c.fill     = totalFill
+    c.alignment= { horizontal:'right', vertical:'middle' }
+    c.border   = { left:thin(), right:thin(), top:thin(), bottom:thin() }
+    c.numFmt   = '#,##0'
   }
 
-  let rr = tr+3
+  // ── Récap en bas ──────────────────────────────────────────────────────────
+  let rr = tr + 3
   const recap = [
-    ['CNSS PART SALARIALE à Payer',   `SUM(H3:H${e})+SUM(I3:I${e})`],
-    ['CNSS PART PATRONALE à Payer',   `SUM(J3:J${e})`],
-    ['Total CNSS',                     `SUM(H3:H${e})+SUM(I3:I${e})+SUM(J3:J${e})+SUM(K3:K${e})`],
-    ['IRPP à payer',                   avecRegul?`SUM(N3:N${e})`:`SUM(L3:L${e})`],
-    ['Montant Global à payer',         avecRegul
-      ? `SUM(J3:J${e})+SUM(K3:K${e})+SUM(H3:H${e})+SUM(I3:I${e})+SUM(N3:N${e})`
-      : `SUM(J3:J${e})+SUM(K3:K${e})+SUM(H3:H${e})+SUM(I3:I${e})+SUM(L3:L${e})`],
+    ['CNSS PART SALARIALE à Payer',  `SUM(H3:H${lastR})+SUM(I3:I${lastR})`],
+    ['CNSS PART PATRONALE à Payer',  `SUM(J3:J${lastR})+SUM(K3:K${lastR})`],
+    ['Total CNSS',                    `SUM(H3:H${lastR})+SUM(I3:I${lastR})+SUM(J3:J${lastR})+SUM(K3:K${lastR})`],
+    ['IRPP à payer',                  avecRegul ? `SUM(N3:N${lastR})` : `SUM(L3:L${lastR})`],
+    ['Montant Global à payer',        avecRegul
+      ? `SUM(H3:H${lastR})+SUM(I3:I${lastR})+SUM(J3:J${lastR})+SUM(K3:K${lastR})+SUM(N3:N${lastR})`
+      : `SUM(H3:H${lastR})+SUM(I3:I${lastR})+SUM(J3:J${lastR})+SUM(K3:K${lastR})+SUM(L3:L${lastR})`],
   ]
   for (const [label, formula] of recap) {
-    ws.getRow(rr).getCell(3).value = label;   ws.getRow(rr).getCell(3).font = cal(12,true)
-    ws.getRow(rr).getCell(4).value = { formula }; ws.getRow(rr).getCell(4).numFmt = '#,##0'
+    const cLabel = ws.getRow(rr).getCell(3)
+    cLabel.value = label; cLabel.font = { name:'Calibri', size:13, bold:true }
+    const cVal   = ws.getRow(rr).getCell(4)
+    cVal.value   = { formula }; cVal.numFmt = '#,##0'; cVal.font = { name:'Calibri', size:13, bold:true }
+    cVal.border  = { bottom:thin() }
     rr++
   }
 }
 
-// ─── SOLDE DE TOUT COMPTE ─────────────────────────────────────────────────────
+// ─── SOLDE DE TOUT COMPTE (imitation parfaite SOLDE_DE_TT_COMPTE.xlsx) ────────
 function genSolde(wb, sheetName, data) {
   const ws = wb.addWorksheet(sheetName)
-  ws.getColumn(5).width = 20; ws.getColumn(6).width = 18; ws.getColumn(8).width = 14.285
 
+  // Largeurs identiques à l'original
+  ws.getColumn(1).width = 4
+  ws.getColumn(2).width = 38
+  ws.getColumn(3).width = 10
+  ws.getColumn(4).width = 10
+  ws.getColumn(5).width = 20
+  ws.getColumn(6).width = 18
+  ws.getColumn(7).width = 10
+  ws.getColumn(8).width = 14.285
+
+  ws.pageSetup.orientation = 'portrait'
+  ws.pageSetup.paperSize   = 9
+  ws.pageSetup.fitToPage   = true
+  ws.pageSetup.fitToWidth  = 1
+
+  // Hauteurs de lignes comme l'original
+  ws.getRow(3).height  = 15.75
+  ws.getRow(4).height  = 21.0
+  ws.getRow(5).height  = 35.25
+  ws.getRow(6).height  = 32.25
+  ws.getRow(7).height  = 36.75
+  ws.getRow(8).height  = 34.5
+  ws.getRow(9).height  = 33.75
+  ws.getRow(10).height = 21.75
+  ws.getRow(11).height = 21.75
+
+  // ── Titre (row 4, style original : size 20 bold) ─────────────────────────
   ws.mergeCells('B4:H5')
-  const t = ws.getCell('B4')
-  t.value     = `   ${data.client_nom} : SOLDE DE TOUT COMPTE : ${data.nom}`
-  t.font      = cal(20,true)
-  t.alignment = aln('center')
+  const titleCell    = ws.getCell('B4')
+  titleCell.value    = `   ${data.client_nom||''} : SOLDE DE TOUT COMPTE : ${data.nom||''}`
+  titleCell.font     = { name:'Calibri', size:20, bold:true }
+  titleCell.alignment= { horizontal:'center', vertical:'middle', wrapText:true }
 
-  for (const [row, txt, h] of [
-    [6, `DEPART : ${data.depart}`, 'left'],
-    [7, `DATE D'EMBAUCHE :  ${data.date_embauche}`, 'left'],
-    [8, `FIN DE CONTRAT : ${data.fin_contrat}`, null],
-    [9, `ANCIENNETE : ${data.anciennete_label}`, 'left'],
-  ]) {
-    ws.mergeCells(`B${row}:H${row}`)
-    const c = ws.getCell(`B${row}`)
-    c.value = txt; c.font = cal(14,true)
-    if (h) c.alignment = { horizontal: h }
+  // ── Infos (rows 6-9) bold size 14 ────────────────────────────────────────
+  const infoLines = [
+    [6, `DEPART : ${data.depart||''}`],
+    [7, `DATE D'EMBAUCHE :  ${data.date_embauche||''}`],
+    [8, `FIN DE CONTRAT : ${data.fin_contrat||''}`],
+    [9, `${data.anciennete_label||''}`],
+  ]
+  for (const [r, txt] of infoLines) {
+    ws.mergeCells(`B${r}:H${r}`)
+    const c    = ws.getCell(`B${r}`)
+    c.value    = txt
+    c.font     = { name:'Calibri', size:14, bold:true }
+    c.alignment= { horizontal:'left', vertical:'middle' }
   }
 
+  // ── En-têtes CALCUL / BASE / TAUX / MONTANT (rows 10-11) ─────────────────
   ws.mergeCells('F10:H10')
-  sc(ws,'F10','CALCUL', cal(16,false), aln('center'))
-  sc(ws,'F11','BASE',   cal(16,false), aln('center'))
-  sc(ws,'G11','TAUX',   cal(16,false), aln('center'))
-  sc(ws,'H11','MONTANT',cal(16,false), aln('center'))
+  sc(ws,'F10','CALCUL',  { name:'Calibri', size:16 }, { horizontal:'center', vertical:'middle' })
+  sc(ws,'F11','BASE',    { name:'Calibri', size:16 }, { horizontal:'center', vertical:'middle' })
+  sc(ws,'G11','TAUX',    { name:'Calibri', size:16 }, { horizontal:'center', vertical:'middle' })
+  sc(ws,'H11','MONTANT', { name:'Calibri', size:16 }, { horizontal:'center', vertical:'middle' })
 
-  // Salaire mois
+  const font16 = { name:'Calibri', size:16, bold:false }
+  const font16b = { name:'Calibri', size:16, bold:true }
+
+  const setRow = (r, h) => { ws.getRow(r).height = h || 28.5 }
+
+  // ── Salaire du mois (row 12) ──────────────────────────────────────────────
+  setRow(12, 28.5)
   ws.mergeCells('B12:E12')
-  sc(ws,'B12',`\u00a0 ${data.salaire_mois_label} `, cal(16,false), aln('left'))
-  ws.getCell('H12').value=data.salaire_mois||0; ws.getCell('H12').font=cal(16,false); ws.getCell('H12').numFmt='#,##0'
+  sc(ws,'B12',`\u00a0 ${data.salaire_mois_label||'SALAIRE DU MOIS'} `, font16, { horizontal:'left', vertical:'middle' })
+  ws.getCell('H12').value  = data.salaire_mois || 0
+  ws.getCell('H12').font   = font16
+  ws.getCell('H12').numFmt = '#,##0'
+  ws.getCell('H12').alignment = { horizontal:'right' }
 
-  // Congés
+  // ── Indemnité congés (row 13) ─────────────────────────────────────────────
+  setRow(13, 27.75)
   ws.mergeCells('B13:E13')
-  sc(ws,'B13','INDEMNITE DE CONGES ACQUIS NON JOUIR ', cal(16,false), aln('left'))
-  ws.getCell('F13').value=data.base_conges||0; ws.getCell('F13').font=cal(16,false); ws.getCell('F13').numFmt='#,##0'
+  sc(ws,'B13','INDEMNITE DE CONGES ACQUIS NON JOUIR ', font16, { horizontal:'left', vertical:'middle' })
+  ws.getCell('F13').value  = data.base_conges || 0
+  ws.getCell('F13').font   = font16b
+  ws.getCell('F13').numFmt = '#,##0'
+  ws.getCell('F13').alignment = { horizontal:'right' }
   const jours = data.jours_conges_list || []
   if (data.taux_conges_auto && jours.length) {
-    ws.getCell('G13').value = { formula: `(${jours.map(([j])=>j).join('+')})/30` }
+    ws.getCell('G13').value = { formula:`(${jours.map(([j])=>j).join('+')})/30` }
   } else {
     ws.getCell('G13').value = data.taux_conges_manuel || 0
   }
-  ws.getCell('G13').font = cal(16,false); ws.getCell('G13').alignment = aln('center')
-  ws.getCell('H13').value={formula:'F13*G13'}; ws.getCell('H13').font=cal(16,false); ws.getCell('H13').numFmt='#,##0.00'
+  ws.getCell('G13').font      = font16
+  ws.getCell('G13').alignment = { horizontal:'center' }
+  ws.getCell('G13').numFmt    = '0.000000'
+  ws.getCell('H13').value     = { formula:'F13*G13' }
+  ws.getCell('H13').font      = font16
+  ws.getCell('H13').numFmt    = '#,##0.00'
+  ws.getCell('H13').alignment = { horizontal:'right' }
 
-  // Total brut
+  // ── TOTAL BRUT (row 14) ───────────────────────────────────────────────────
+  setRow(14, 29.25)
   ws.mergeCells('B14:E14')
-  sc(ws,'B14',' TOTAL BRUT SOLDE DE TOUT COMPTE', cal(16,true), aln('left'))
-  ws.getCell('H14').value={formula:'H12+H13'}; ws.getCell('H14').font=cal(16,false); ws.getCell('H14').numFmt='#,##0.00'
+  sc(ws,'B14',' TOTAL BRUT SOLDE DE TOUT COMPTE', font16b, { horizontal:'left', vertical:'middle' })
+  ws.getCell('H14').value  = { formula:'H12+H13' }
+  ws.getCell('H14').font   = font16
+  ws.getCell('H14').numFmt = '#,##0.00'
+  ws.getCell('H14').alignment = { horizontal:'right' }
 
-  // CNSS
+  // ── CNSS (row 15) — base = H14-140000 comme l'original ───────────────────
+  setRow(15, 29.25)
   ws.mergeCells('B15:E15')
-  sc(ws,'B15','CNSS', cal(16,false), aln('left'))
-  ws.getCell('F15').value={formula:'H14-140000'}; ws.getCell('F15').font=cal(16,true); ws.getCell('F15').alignment=aln('center'); ws.getCell('F15').numFmt='#,##0'
-  ws.getCell('G15').value=0.04; ws.getCell('G15').font=cal(16,false); ws.getCell('G15').alignment=aln('center'); ws.getCell('G15').numFmt='0%'
-  ws.getCell('H15').value={formula:'F15*G15'}; ws.getCell('H15').font=cal(16,false); ws.getCell('H15').numFmt='#,##0'
+  sc(ws,'B15','CNSS', font16, { horizontal:'left', vertical:'middle' })
+  ws.getCell('F15').value     = { formula:'H14-140000' }
+  ws.getCell('F15').font      = font16b
+  ws.getCell('F15').numFmt    = '#,##0'
+  ws.getCell('F15').alignment = { horizontal:'right' }
+  ws.getCell('G15').value     = 0.04
+  ws.getCell('G15').font      = font16
+  ws.getCell('G15').numFmt    = '0%'
+  ws.getCell('G15').alignment = { horizontal:'center' }
+  ws.getCell('H15').value     = { formula:'F15*G15' }
+  ws.getCell('H15').font      = font16
+  ws.getCell('H15').numFmt    = '#,##0'
+  ws.getCell('H15').alignment = { horizontal:'right' }
 
-  // AMU
+  // ── AMU (row 16) ─────────────────────────────────────────────────────────
+  setRow(16, 29.25)
   ws.mergeCells('B16:E16')
-  sc(ws,'B16','AMU', cal(16,false), aln('left'))
-  ws.getCell('F16').value={formula:'H14-140000'}; ws.getCell('F16').font=cal(16,true); ws.getCell('F16').alignment=aln('center'); ws.getCell('F16').numFmt='#,##0'
-  ws.getCell('G16').value=0.05; ws.getCell('G16').font=cal(16,false); ws.getCell('G16').alignment=aln('center'); ws.getCell('G16').numFmt='0%'
-  ws.getCell('H16').value={formula:'F16*G16'}; ws.getCell('H16').font=cal(16,false); ws.getCell('H16').alignment=aln('right'); ws.getCell('H16').numFmt='#,##0'
+  sc(ws,'B16','AMU', font16, { horizontal:'left', vertical:'middle' })
+  ws.getCell('F16').value     = { formula:'H14-140000' }
+  ws.getCell('F16').font      = font16b
+  ws.getCell('F16').numFmt    = '#,##0'
+  ws.getCell('F16').alignment = { horizontal:'right' }
+  ws.getCell('G16').value     = 0.05
+  ws.getCell('G16').font      = font16
+  ws.getCell('G16').numFmt    = '0%'
+  ws.getCell('G16').alignment = { horizontal:'center' }
+  ws.getCell('H16').value     = { formula:'F16*G16' }
+  ws.getCell('H16').font      = font16
+  ws.getCell('H16').numFmt    = '#,##0'
+  ws.getCell('H16').alignment = { horizontal:'right' }
 
-  // IRPP
+  // ── IRPP (row 17) ─────────────────────────────────────────────────────────
+  setRow(17, 27.0)
   ws.mergeCells('B17:E17')
-  sc(ws,'B17','IRPP', cal(16,false), aln('left'))
-  ws.getCell('H17').value=data.irpp||0; ws.getCell('H17').font=cal(16,false); ws.getCell('H17').numFmt='#,##0'
+  sc(ws,'B17','IRPP', font16, { horizontal:'left', vertical:'middle' })
+  ws.getCell('H17').value     = data.irpp || 0
+  ws.getCell('H17').font      = font16
+  ws.getCell('H17').numFmt    = '#,##0'
+  ws.getCell('H17').alignment = { horizontal:'right' }
 
   let r = 18
+
+  // Retenues arriérées si présentes
   if (data.retenues_arrierees) {
+    setRow(r, 28.5)
     ws.mergeCells(`B${r}:E${r}`)
-    sc(ws,`B${r}`,'TOTAL RETENUES ARRIEREES RESTANT A PRELEVE', cal(16,false), aln('left'))
-    ws.getCell(`H${r}`).value=data.retenues_arrierees; ws.getCell(`H${r}`).numFmt='#,##0'; r++
-    ws.mergeCells(`B${r}:E${r}`)
-    sc(ws,`B${r}`,'TOTAL DES RETENUES', cal(16,true), aln('left'))
-    ws.getCell(`H${r}`).value={formula:`H15+H16+H17+H${r-1}`}; ws.getCell(`H${r}`).font=cal(16,true); ws.getCell(`H${r}`).numFmt='#,##0'
-  } else {
-    ws.mergeCells(`B${r}:E${r}`)
-    sc(ws,`B${r}`,'TOTAL DES RETENUES', cal(16,true), aln('left'))
-    ws.getCell(`H${r}`).value={formula:'H15+H16+H17'}; ws.getCell(`H${r}`).font=cal(16,true); ws.getCell(`H${r}`).numFmt='#,##0'
+    sc(ws,`B${r}`,'TOTAL RETENUES ARRIEREES RESTANT A PRELEVE', font16, { horizontal:'left', vertical:'middle' })
+    ws.getCell(`H${r}`).value     = data.retenues_arrierees
+    ws.getCell(`H${r}`).font      = font16
+    ws.getCell(`H${r}`).numFmt    = '#,##0'
+    ws.getCell(`H${r}`).alignment = { horizontal:'right' }
+    r++
   }
+
+  // ── TOTAL DES RETENUES ────────────────────────────────────────────────────
+  setRow(r, 28.5)
+  ws.mergeCells(`B${r}:E${r}`)
+  sc(ws,`B${r}`,'TOTAL DES RETENUES', font16b, { horizontal:'left', vertical:'middle' })
+  const totalFormula = data.retenues_arrierees ? `H15+H16+H17+H${r-1}` : 'H15+H16+H17'
+  ws.getCell(`H${r}`).value     = { formula: totalFormula }
+  ws.getCell(`H${r}`).font      = font16b
+  ws.getCell(`H${r}`).numFmt    = '#,##0'
+  ws.getCell(`H${r}`).alignment = { horizontal:'right' }
   const totR = r; r++
 
+  // ── SALAIRE NET SOLDE DE TOUT COMPTE ─────────────────────────────────────
+  setRow(r, 28.5)
   ws.mergeCells(`B${r}:E${r}`)
-  sc(ws,`B${r}`,'SALAIRE NET SOLDE DE TOUT COMPTE', cal(16,true), aln('left'))
-  ws.getCell(`H${r}`).value={formula:`H14-H${totR}`}; ws.getCell(`H${r}`).font=cal(16,true); ws.getCell(`H${r}`).numFmt='#,##0'
+  sc(ws,`B${r}`,'SALAIRE NET SOLDE DE TOUT COMPTE', font16b, { horizontal:'left', vertical:'middle' })
+  ws.getCell(`H${r}`).value     = { formula:`H14-H${totR}` }
+  ws.getCell(`H${r}`).font      = font16b
+  ws.getCell(`H${r}`).numFmt    = '#,##0'
+  ws.getCell(`H${r}`).alignment = { horizontal:'right' }
   const netR = r; r++
 
+  // ── Préavis (optionnel) ───────────────────────────────────────────────────
+  let preR = null
   if (data.inclure_preavis) {
+    setRow(r, 25.5)
     ws.mergeCells(`B${r}:E${r}`)
-    sc(ws,`B${r}`,'MONTANT DU PREAVIS', cal(16,true), aln('left'))
-    ws.getCell(`H${r}`).value=data.preavis||0; ws.getCell(`H${r}`).font=cal(16,true); ws.getCell(`H${r}`).numFmt='#,##0'
-    const preR = r; r++
-    ws.mergeCells(`B${r}:E${r}`)
-    sc(ws,`B${r}`,'AVANCE SUR SOLDE DE TOUT COMPTE', cal(16,true), aln('left'))
-    ws.getCell(`H${r}`).value=data.avance||0; ws.getCell(`H${r}`).font=cal(16,true); ws.getCell(`H${r}`).numFmt='#,##0'
-    const avR = r; r++
-    // Retenue sur solde de tout compte
-    ws.mergeCells(`B${r}:E${r}`)
-    sc(ws,`B${r}`,'RETENUE SUR SOLDE DE TOUT COMPTE', cal(16,true), aln('left'))
-    ws.getCell(`H${r}`).value=data.retenue_sur_solde||0; ws.getCell(`H${r}`).font=cal(16,true); ws.getCell(`H${r}`).numFmt='#,##0'
-    const retSoldeR = r; r++
-    ws.mergeCells(`B${r}:E${r}`)
-    sc(ws,`B${r}`,'NET A PAYER', cal(16,true), aln('left'))
-    ws.getCell(`H${r}`).value={formula:`H${netR}-H${preR}-H${avR}-H${retSoldeR}`}; ws.getCell(`H${r}`).font=cal(16,true); ws.getCell(`H${r}`).numFmt='#,##0'
-    const netPayR = r; r++
-    // Solde final
-    ws.mergeCells(`B${r}:E${r}`)
-    sc(ws,`B${r}`,'SOLDE', cal(18,true), aln('left'))
-    ws.getCell(`B${r}`).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFD9E1F2'}}
-    ws.getCell(`H${r}`).value={formula:`H${netPayR}`}; ws.getCell(`H${r}`).font=cal(18,true); ws.getCell(`H${r}`).numFmt='#,##0'
-    ws.getCell(`H${r}`).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFD9E1F2'}}
-  } else {
-    ws.mergeCells(`B${r}:E${r}`)
-    sc(ws,`B${r}`,'AVANCE SUR SOLDE DE TOUT COMPTE', cal(16,true), aln('left'))
-    ws.getCell(`H${r}`).value=data.avance||0; ws.getCell(`H${r}`).font=cal(16,true); ws.getCell(`H${r}`).numFmt='#,##0'
-    const avR = r; r++
-    // Retenue sur solde de tout compte
-    ws.mergeCells(`B${r}:E${r}`)
-    sc(ws,`B${r}`,'RETENUE SUR SOLDE DE TOUT COMPTE', cal(16,true), aln('left'))
-    ws.getCell(`H${r}`).value=data.retenue_sur_solde||0; ws.getCell(`H${r}`).font=cal(16,true); ws.getCell(`H${r}`).numFmt='#,##0'
-    const retSoldeR = r; r++
-    ws.mergeCells(`B${r}:E${r}`)
-    sc(ws,`B${r}`,'NET A PAYER', cal(16,true), aln('left'))
-    ws.getCell(`H${r}`).value={formula:`H${netR}-H${avR}-H${retSoldeR}`}; ws.getCell(`H${r}`).font=cal(16,true); ws.getCell(`H${r}`).numFmt='#,##0'
-    const netPayR = r; r++
-    // Solde final
-    ws.mergeCells(`B${r}:E${r}`)
-    sc(ws,`B${r}`,'SOLDE', cal(18,true), aln('left'))
-    ws.getCell(`B${r}`).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFD9E1F2'}}
-    ws.getCell(`H${r}`).value={formula:`H${netPayR}`}; ws.getCell(`H${r}`).font=cal(18,true); ws.getCell(`H${r}`).numFmt='#,##0'
-    ws.getCell(`H${r}`).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFD9E1F2'}}
+    sc(ws,`B${r}`,'MONTANT DU PREAVIS', font16b, { horizontal:'left', vertical:'middle' })
+    ws.getCell(`H${r}`).value     = data.preavis || 0
+    ws.getCell(`H${r}`).font      = font16b
+    ws.getCell(`H${r}`).numFmt    = '#,##0'
+    ws.getCell(`H${r}`).alignment = { horizontal:'right' }
+    preR = r; r++
   }
 
+  // ── AVANCE SUR SOLDE ──────────────────────────────────────────────────────
+  setRow(r, 25.5)
+  ws.mergeCells(`B${r}:E${r}`)
+  sc(ws,`B${r}`,'AVANCE SUR SOLDE DE TOUT COMPTE', font16b, { horizontal:'left', vertical:'middle' })
+  ws.getCell(`H${r}`).value     = data.avance || 0
+  ws.getCell(`H${r}`).font      = font16b
+  ws.getCell(`H${r}`).numFmt    = '#,##0'
+  ws.getCell(`H${r}`).alignment = { horizontal:'right' }
+  const avR = r; r++
+
+  // ── RETENUE SUR SOLDE DE TOUT COMPTE ─────────────────────────────────────
+  let retSoldeR = null
+  if (data.retenue_sur_solde) {
+    setRow(r, 25.5)
+    ws.mergeCells(`B${r}:E${r}`)
+    sc(ws,`B${r}`,'RETENUE SUR SOLDE DE TOUT COMPTE', font16b, { horizontal:'left', vertical:'middle' })
+    ws.getCell(`H${r}`).value     = data.retenue_sur_solde
+    ws.getCell(`H${r}`).font      = font16b
+    ws.getCell(`H${r}`).numFmt    = '#,##0'
+    ws.getCell(`H${r}`).alignment = { horizontal:'right' }
+    retSoldeR = r; r++
+  }
+
+  // ── NET A PAYER ───────────────────────────────────────────────────────────
+  setRow(r, 29.25)
+  ws.mergeCells(`B${r}:E${r}`)
+  sc(ws,`B${r}`,'NET A PAYER', font16b, { horizontal:'left', vertical:'middle' })
+  const netPayParts = [netR, preR, avR, retSoldeR].filter(Boolean)
+  const netPayFormula = netPayParts.length === 1
+    ? `H${netPayParts[0]}`
+    : `H${netPayParts[0]}-${netPayParts.slice(1).map(x=>`H${x}`).join('-')}`
+  ws.getCell(`H${r}`).value     = { formula: netPayFormula }
+  ws.getCell(`H${r}`).font      = font16b
+  ws.getCell(`H${r}`).numFmt    = '#,##0'
+  ws.getCell(`H${r}`).alignment = { horizontal:'right' }
+  const netPayR = r; r++
+
+  // ── SOLDE (ligne finale mise en évidence) ─────────────────────────────────
+  setRow(r, 29.25)
+  ws.mergeCells(`B${r}:G${r}`)
+  ws.getCell(`B${r}`).value     = 'SOLDE'
+  ws.getCell(`B${r}`).font      = { name:'Calibri', size:18, bold:true }
+  ws.getCell(`B${r}`).alignment = { horizontal:'left', vertical:'middle' }
+  ws.getCell(`B${r}`).fill      = { type:'pattern', pattern:'solid', fgColor:{argb:'FFD9E1F2'} }
+  ws.getCell(`H${r}`).value     = { formula:`H${netPayR}` }
+  ws.getCell(`H${r}`).font      = { name:'Calibri', size:18, bold:true }
+  ws.getCell(`H${r}`).numFmt    = '#,##0'
+  ws.getCell(`H${r}`).alignment = { horizontal:'right' }
+  ws.getCell(`H${r}`).fill      = { type:'pattern', pattern:'solid', fgColor:{argb:'FFD9E1F2'} }
+  r++
+
+  // ── Note congés (comme l'original) ───────────────────────────────────────
   if (jours.length) {
-    const noteR = r+3
+    const noteR = r + 3
+    ws.getRow(noteR).height    = 15.75
     const total = jours.map(([j])=>j).join(' + ')
     ws.getCell(`B${noteR}`).value = `TAUX DE CONGES ACQUIS NON JOUIR= (${total}) / 30 jours`
-    ws.getCell(`B${noteR}`).font  = cal(12,true)
-    jours.forEach(([j,l], i) => {
-      ws.getCell(`B${noteR+2+(i*2)}`).value = `${j} jours= ${l}`
-      ws.getCell(`B${noteR+2+(i*2)}`).font  = cal(12,true)
+    ws.getCell(`B${noteR}`).font  = { name:'Calibri', size:12, bold:true }
+    jours.forEach(([j,l], idx) => {
+      const nr = noteR + 2 + (idx*2)
+      ws.getRow(nr).height = 15.75
+      ws.getCell(`B${nr}`).value = `${j} jours= ${l}`
+      ws.getCell(`B${nr}`).font  = { name:'Calibri', size:12, bold:true }
     })
   }
 }

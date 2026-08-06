@@ -170,13 +170,13 @@ function sc(ws, addr, val, font, align, border, numFmt) {
 function genBulletin(wb, sheetName, data) {
   const ws = wb.addWorksheet(sheetName)
 
-  // Largeurs colonnes exactes de la ref
-  ws.getColumn(1).width = 19.0
-  ws.getColumn(2).width = 21.855
-  ws.getColumn(3).width = 9.711
-  ws.getColumn(4).width = 10.426
-  ws.getColumn(5).width = 10.855
-  ws.getColumn(6).width = 10.141
+  // Largeurs adaptées (ref x 1.5 pour colonnes données)
+  ws.getColumn(1).width = 8.0      // Code
+  ws.getColumn(2).width = 28.0     // Rubriques — assez pour "Indemnité de communication"
+  ws.getColumn(3).width = 16.0     // Base — assez pour 2 000 000
+  ws.getColumn(4).width = 10.0     // Taux/NB
+  ws.getColumn(5).width = 14.0     // Retenues
+  ws.getColumn(6).width = 14.0     // Gains
 
   ws.pageSetup.orientation = 'portrait'
   ws.pageSetup.paperSize   = 9
@@ -361,8 +361,9 @@ function genBulletin(wb, sheetName, data) {
     ws.getCell(`D${row}`).font      = cg10
     // E: vide
     ws.getCell(`E${row}`).border    = { left:thin() }
-    // F: Gains = C (formule)
-    ws.getCell(`F${row}`).value     = { formula:`C${row}` }
+    // F: Gains = valeur directe (ExcelJS ne calcule pas les formules)
+    const gainVal = rub.base != null ? rub.base : 0
+    ws.getCell(`F${row}`).value     = { formula:`C${row}`, result: gainVal }
     ws.getCell(`F${row}`).numFmt    = nf
     ws.getCell(`F${row}`).border    = { left:thin(), right:dbl() }
     ws.getCell(`F${row}`).font      = cg10
@@ -381,7 +382,8 @@ function genBulletin(wb, sheetName, data) {
   ws.getCell(`C${brutRow}`).border = { left:thin() }
   ws.getCell(`D${brutRow}`).border = { left:thin() }
   ws.getCell(`E${brutRow}`).border = { left:thin() }
-  ws.getCell(`F${brutRow}`).value  = { formula:`SUM(F${first}:F${last})` }
+  const brutTotal = (data.rubriques||[]).reduce((s,r) => s + (r.base||0), 0)
+  ws.getCell(`F${brutRow}`).value  = { formula:`SUM(F${first}:F${last})`, result: brutTotal }
   ws.getCell(`F${brutRow}`).numFmt = nf
   ws.getCell(`F${brutRow}`).font   = cg10b
   ws.getCell(`F${brutRow}`).border = { left:thin(), right:dbl() }
@@ -472,9 +474,10 @@ function genBulletin(wb, sheetName, data) {
   ws.getCell(`A${netRow}`).border    = { left:dbl(), right:thin(), top:thin(), bottom:dbl() }
   ws.getRow(netRow).height = 15.75
   // F: net a payer — ref: =F38 (net légal directement si avance=0, sinon =F38-E40)
+  const netPayVal = netLegalVal - avanceVal
   ws.getCell(`F${netRow}`).value  = data.avance_salaire
-    ? { formula:`F${netLegalRow}-E${autRow}` }
-    : { formula:`F${netLegalRow}` }
+    ? { formula:`F${netLegalRow}-E${autRow}`, result: netPayVal }
+    : { formula:`F${netLegalRow}`, result: netPayVal }
   ws.getCell(`F${netRow}`).numFmt = nfNet
   ws.getCell(`F${netRow}`).font   = cg12b
   ws.getCell(`F${netRow}`).fill   = fillNavy
@@ -507,7 +510,7 @@ function genBulletin(wb, sheetName, data) {
   ws.getRow(row).height = 23.25
   ws.getCell(`E${row}`).value     = 'Masse Salariale'
   ws.getCell(`E${row}`).font      = cg8b
-  ws.getCell(`F${row}`).value     = { formula:`F${brutRow}+F${patRow}+F${amuPatRow}` }
+  ws.getCell(`F${row}`).value     = { formula:`F${brutRow}+F${patRow}+F${amuPatRow}`, result: brutTotal + patronalVal + amuVal }
   ws.getCell(`F${row}`).numFmt    = nfNet
   ws.getCell(`F${row}`).font      = cg10b
   ws.getCell(`F${row}`).alignment = aC
@@ -1106,6 +1109,20 @@ export default async function handler(req, res) {
         `${mois.substring(0,4)} ${p.period_year}${avec_regularisation?' REGUL':''}`,
         `${p.client_name}: ETAT DES RETENUES ET SALAIRES NETS A PAYER ${mois} ${p.period_year} ${suffix}`,
         employes, !!avec_regularisation)
+      if (req.body.json) {
+        const jsonRows = employes.map((emp,i) => [
+          i+1, emp.nom, emp.responsable||'', emp.poste||'', emp.pole||'',
+          emp.brut||0, emp.brut_imposable||0,
+          Math.round((emp.brut_imposable||0)*0.04),
+          Math.round((emp.brut_imposable||0)*0.05),
+          Math.round((emp.brut_imposable||0)*0.175),
+          Math.round((emp.brut_imposable||0)*0.05),
+          emp.irpp||0,
+          ...(avecRegul ? [emp.regularisation_irpp||0, (emp.irpp||0)+(emp.regularisation_irpp||0)] : []),
+          emp.net_payer||0,
+        ])
+        return res.status(200).json({ title, rows: jsonRows })
+      }
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
       res.setHeader('Content-Disposition', `attachment; filename="Etat_Charges_${mois}_${p.period_year}.xlsx"`)
       await wb2.xlsx.write(res)
@@ -1172,6 +1189,30 @@ export default async function handler(req, res) {
         retenue_sur_solde: retenue_sur_solde || 0,
       })
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+      if (req.body.json) {
+        return res.status(200).json({
+          title: `${emp.last_name} ${emp.first_name} : SOLDE DE TOUT COMPTE`,
+          depart: fmt(date_depart),
+          embauche: emp.hire_date ? fmt(emp.hire_date) : '',
+          fin_contrat: fmt(date_fin_contrat || date_depart),
+          anciennete: ancData ? ancData.label : '',
+          net_payer: netFinal,
+          lignes: [
+            { label: salaireMoisLabel, montant: brut },
+            { label: 'INDEMNITE DE CONGES ACQUIS NON JOUIR', base: baseConges, taux: tauxConges, montant: indConges },
+            { label: 'TOTAL BRUT SOLDE DE TOUT COMPTE', montant: totalBrut },
+            { label: 'CNSS (4%)', base: Math.max(0,totalBrut-140000), taux: '4%', montant: cnssVal },
+            { label: 'AMU (5%)', base: Math.max(0,totalBrut-140000), taux: '5%', montant: amuVal },
+            { label: 'IRPP', montant: irppVal },
+            ...(retenues_arrierees ? [{ label: 'RETENUES ARRIEREES', montant: retenues_arrierees }] : []),
+            { label: 'TOTAL DES RETENUES', montant: totalRetenues },
+            { label: 'SALAIRE NET SOLDE DE TOUT COMPTE', montant: netSolde },
+            ...(inclure_preavis ? [{ label: 'MONTANT DU PREAVIS', montant: preavis }] : []),
+            { label: 'AVANCE SUR SOLDE DE TOUT COMPTE', montant: avance },
+            ...(retenue_sur_solde ? [{ label: 'RETENUE SUR SOLDE DE TOUT COMPTE', montant: retenue_sur_solde }] : []),
+          ],
+        })
+      }
       res.setHeader('Content-Disposition', `attachment; filename="Solde_${emp.last_name}_${fmt(date_depart).replace(/\//g,'-')}.xlsx"`)
       await wb2.xlsx.write(res)
       return res.end()

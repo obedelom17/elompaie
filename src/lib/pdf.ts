@@ -107,6 +107,8 @@ export async function generateBulletinPDF(data: BulletinData): Promise<jsPDF> {
   const lx = ML + 36; const vx = ML + 38
   let iy = y + 5.5
   const lh = 4.2
+  // Helper pour accéder aux champs avec fallback
+  const emp = employee
   const infoLine = (label: string, val: string) => {
     doc.setFont('helvetica', 'bold'); doc.setFontSize(8)
     doc.text(label, lx, iy, { align: 'right' })
@@ -114,15 +116,15 @@ export async function generateBulletinPDF(data: BulletinData): Promise<jsPDF> {
     doc.text(val || '', vx, iy)
     iy += lh
   }
-  infoLine('Nom & Prénoms :', `${employee.last_name || ''} ${employee.first_name || ''}`)
-  infoLine('N°Assuré :', employee.social_security_number || employee.matricule || '')
-  infoLine('NIF:', employee.nif || '')
-  infoLine('Direction/section:', employee.category || '')
-  infoLine('Poste/Fonction:', employee.position || '')
-  infoLine('Téléphone:', employee.phone || '')
-  infoLine("Date d'embauche:", employee.hire_date ? new Date(employee.hire_date).toLocaleDateString('fr-FR') : '')
+  infoLine('Nom & Prénoms :', `${emp.last_name || ''} ${emp.first_name || ''}`)
+  infoLine('N°Assuré :', emp.social_security_number || emp.matricule || emp.n_assure || '')
+  infoLine('NIF:', emp.nif || emp.nif_employe || '')
+  infoLine('Direction/section:', emp.category || emp.direction || '')
+  infoLine('Poste/Fonction:', emp.position || emp.poste || '')
+  infoLine('Téléphone:', emp.phone || emp.telephone || '')
+  infoLine("Date d'embauche:", (emp.hire_date || emp.date_embauche) ? new Date(emp.hire_date || emp.date_embauche).toLocaleDateString('fr-FR') : '')
   doc.setFont('helvetica', 'bold'); doc.text('Pers à charge', lx, iy, { align: 'right' })
-  doc.setFont('helvetica', 'normal'); doc.text(String(employee.children_count || 0), vx, iy)
+  doc.setFont('helvetica', 'normal'); doc.text(String(emp.children_count ?? emp.personnes_charge ?? 0), vx, iy)
   y += 34
 
   // ── Header tableau ─────────────────────────────────────────────────────────
@@ -155,15 +157,18 @@ export async function generateBulletinPDF(data: BulletinData): Promise<jsPDF> {
 
   // ── Rubriques ──────────────────────────────────────────────────────────────
   const rH = 5
+  // Sursalaire = overtime_premium - anciennete (car anciennete a été additionné dans overtime_premium)
+  const anciennetePDF = variables.anciennete || 0
+  const sursalairePDF = Math.max(0, (variables.overtime_premium || 0) - anciennetePDF)
   const rubriques = [
-    { label: 'Salaire de Base',           base: variables.base_salary       || 0 },
-    { label: 'Sursalaire',                base: variables.overtime_premium   || 0 },
-    { label: 'Ancienneté',                base: variables.anciennete         || 0 },
-    { label: 'Indemnité de fonction',     base: variables.function_allowance || 0 },
-    { label: 'Indemnité de logement',     base: variables.housing_premium    || 0 },
-    { label: 'Indemnité de Transport',    base: variables.transport_allowance|| 0 },
-    { label: 'Indemnité de repas',        base: variables.meal_premium       || 0 },
-    { label: 'Indemnité de communication',base: variables.communication_allowance || 0 },
+    { label: 'Salaire de Base',            base: variables.base_salary           || 0 },
+    { label: 'Sursalaire',                 base: sursalairePDF                        },
+    { label: 'Ancienneté',                 base: anciennetePDF                        },
+    { label: 'Indemnité de fonction',      base: variables.function_allowance    || 0 },
+    { label: 'Indemnité de logement',      base: variables.housing_premium       || 0 },
+    { label: 'Indemnité de Transport',     base: variables.transport_allowance   || 0 },
+    { label: 'Indemnité de repas',         base: variables.meal_premium          || 0 },
+    { label: 'Indemnité de communication', base: variables.communication_allowance|| 0 },
   ]
 
   doc.setFont('helvetica', 'normal'); doc.setFontSize(8)
@@ -241,7 +246,7 @@ export async function generateBulletinPDF(data: BulletinData): Promise<jsPDF> {
   y += rH
 
   // ── Retenue avance ─────────────────────────────────────────────────────────
-  const advance = variables.salary_advance || 0
+  const advance = variables.salary_advance || (variables as any).avance_salaire || 0
   doc.setDrawColor(200,200,200); doc.setLineWidth(0.15)
   doc.rect(ML, y, TW, rH)
   ;[cols.rubX, cols.baseX, cols.tauxX, cols.retX, cols.gainX, MR].forEach(x => {

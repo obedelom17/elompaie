@@ -132,20 +132,26 @@ export default function ExportReports() {
     if (!vars) throw new Error('Aucune variable de paie trouvée')
 
     const emp   = bulletinEmployees.find(e => e.id === empId) || {} as any
+    // Mapper tous les champs DB (snake_case) vers PayrollInput
+    const anciennete = vars.anciennete || vars.indemnite_anciennete || 0
     const input = {
-      base_salary:              vars.base_salary             || 0,
-      overtime_premium:         vars.overtime_premium        || vars.sursalaire || 0,
-      function_allowance:       vars.function_allowance      || 0,
-      communication_allowance:  vars.communication_allowance || 0,
-      housing_premium:          vars.housing_premium         || 0,
-      meal_premium:             vars.meal_premium            || 0,
-      transport_allowance:      vars.transport_allowance     || 0,
-      salary_advance:           vars.salary_advance          || vars.avance_salaire || 0,
-      loan_payment:             vars.loan_payment            || 0,
-      flat_deduction:           vars.flat_deduction          || 0,
-      marital_status:           emp.marital_status           || vars.marital_status || 'celibataire',
-      children_count:           emp.children_count           || vars.children_count || 0,
+      base_salary:               Number(vars.base_salary)                                   || 0,
+      // overtime_premium inclut le sursalaire ET l'ancienneté (non dans PayrollInput)
+      overtime_premium:          (Number(vars.overtime_premium || vars.sursalaire)          || 0)
+                                 + anciennete,
+      function_allowance:        Number(vars.function_allowance  || vars.indemnite_fonction) || 0,
+      communication_allowance:   Number(vars.communication_allowance || vars.indemnite_communication) || 0,
+      housing_premium:           Number(vars.housing_premium    || vars.indemnite_logement)  || 0,
+      meal_premium:              Number(vars.meal_premium       || vars.indemnite_repas)      || 0,
+      transport_allowance:       Number(vars.transport_allowance|| vars.indemnite_transport)  || 0,
+      salary_advance:            Number(vars.salary_advance     || vars.avance_salaire)       || 0,
+      loan_payment:              Number(vars.loan_payment       || vars.remboursement_pret)   || 0,
+      flat_deduction:            Number(vars.flat_deduction     || vars.deduction_forfaitaire)|| 0,
+      marital_status:            emp.marital_status  || vars.marital_status  || 'celibataire',
+      children_count:            Number(emp.children_count ?? vars.children_count)            || 0,
     }
+    // Stocker anciennete séparément pour l'affichage dans le bulletin
+    const ancienneteVal = anciennete
     const result  = calculatePayroll(input)
     const lbl     = getPeriodLabel(periodId)
     const empName = (emp as any).last_name || 'employe'
@@ -175,8 +181,8 @@ export default function ExportReports() {
         period_month:  periodData.period_month,
         period_year:   periodData.period_year,
         clients: {
-          name:         periodData.client_name || '',
-          logo_url:     periodData.logo_url    || null,
+          name:         periodData.client_name  || '',
+          logo_url:     periodData.logo_url     || null,
           num_employeur:periodData.num_employeur|| '',
           nif:          periodData.nif          || '',
           entite_name:  periodData.entite_name  || '',
@@ -185,7 +191,7 @@ export default function ExportReports() {
           address:      periodData.address      || '',
         },
       },
-      variables: input,
+      variables: { ...input, anciennete: ancienneteVal },
       result,
       orgName:  periodData.client_name || '',
       returnDoc: true,

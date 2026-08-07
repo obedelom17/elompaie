@@ -126,7 +126,7 @@ export default function ExportReports() {
   const generateBulletin = async (empId: string, periodId: string, format: Format) => {
     const [varsData, periodData] = await Promise.all([
       fetch(`/api/payroll-variables?period_id=${periodId}&employee_id=${empId}`, { credentials:'include' }).then(r => r.json()),
-      fetch(`/api/payroll/${periodId}`, { credentials:'include' }).then(r => r.json()),
+      fetch(`/api/payroll?id=${periodId}`, { credentials:'include' }).then(r => r.json()),
     ])
     const vars = Array.isArray(varsData) ? varsData[0] : varsData
     if (!vars) throw new Error('Aucune variable de paie trouvée')
@@ -156,9 +156,35 @@ export default function ExportReports() {
       return
     }
 
+    // periodData contient directement period_month, period_year, client_name, logo_url, etc.
     const doc = await generateBulletinPDF({
-      employee: { ...emp, ...vars },
-      period:   { ...periodData, clients: periodData.client || periodData },
+      employee: {
+        ...emp,
+        last_name:               emp.last_name || vars.last_name || '',
+        first_name:              emp.first_name || vars.first_name || '',
+        social_security_number:  emp.social_security_number || vars.social_security_number || '',
+        position:                emp.position || vars.position || '',
+        category:                emp.category || vars.category || '',
+        phone:                   emp.phone || vars.phone || '',
+        hire_date:               emp.hire_date || vars.hire_date || '',
+        children_count:          emp.children_count ?? vars.children_count ?? 0,
+        marital_status:          emp.marital_status || vars.marital_status || 'celibataire',
+        nif:                     emp.nif || vars.nif_employe || '',
+      },
+      period: {
+        period_month:  periodData.period_month,
+        period_year:   periodData.period_year,
+        clients: {
+          name:         periodData.client_name || '',
+          logo_url:     periodData.logo_url    || null,
+          num_employeur:periodData.num_employeur|| '',
+          nif:          periodData.nif          || '',
+          entite_name:  periodData.entite_name  || '',
+          bp:           periodData.bp           || '',
+          phone:        periodData.client_phone || '',
+          address:      periodData.address      || '',
+        },
+      },
       variables: input,
       result,
       orgName:  periodData.client_name || '',

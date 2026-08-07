@@ -25,10 +25,20 @@ export async function generateBulletinPDF(data: BulletinData): Promise<jsPDF> {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   const W = 210; const ML = 10; const MR = W - 10
   const TW = MR - ML // largeur totale = 190
-  const monthName = MONTH_NAMES[period.period_month - 1].toUpperCase()
-  const client = period.clients || {}
-  const moisNum = String(period.period_month).padStart(2, '0')
-  const lastDay = new Date(period.period_year, period.period_month, 0).getDate()
+  const monthNum  = Number(period.period_month) || 1
+  const monthName = (MONTH_NAMES[monthNum - 1] || 'MOIS').toUpperCase()
+  const client = period.clients || period.client || {
+    name:          (period as any).client_name   || '',
+    logo_url:      (period as any).logo_url      || null,
+    num_employeur: (period as any).num_employeur || '',
+    nif:           (period as any).nif           || '',
+    entite_name:   (period as any).entite_name   || '',
+    bp:            (period as any).bp            || '',
+    phone:         (period as any).client_phone  || '',
+    address:       (period as any).address       || '',
+  }
+  const moisNum = String(monthNum).padStart(2, '0')
+  const lastDay = new Date(Number(period.period_year) || 2026, monthNum, 0).getDate()
 
   // ── LOGO ────────────────────────────────────────────────────────────────────
   const logoW = 48; const logoH = 24

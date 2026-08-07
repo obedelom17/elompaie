@@ -1110,18 +1110,20 @@ export default async function handler(req, res) {
         `${p.client_name}: ETAT DES RETENUES ET SALAIRES NETS A PAYER ${mois} ${p.period_year} ${suffix}`,
         employes, !!avec_regularisation)
       if (req.body.json) {
+        const avecRegulFlag = !!avec_regularisation
+        const titleVal = `${p.client_name}: ETAT DES RETENUES ET SALAIRES NETS A PAYER ${mois} ${p.period_year}`
         const jsonRows = employes.map((emp,i) => [
           i+1, emp.nom, emp.responsable||'', emp.poste||'', emp.pole||'',
-          emp.brut||0, emp.brut_imposable||0,
+          emp.brut_imposable||0, emp.brut_imposable||0,
           Math.round((emp.brut_imposable||0)*0.04),
           Math.round((emp.brut_imposable||0)*0.05),
           Math.round((emp.brut_imposable||0)*0.175),
           Math.round((emp.brut_imposable||0)*0.05),
           emp.irpp||0,
-          ...(avecRegul ? [emp.regularisation_irpp||0, (emp.irpp||0)+(emp.regularisation_irpp||0)] : []),
+          ...(avecRegulFlag ? [emp.regularisation_irpp||0, (emp.irpp||0)+(emp.regularisation_irpp||0)] : []),
           emp.net_payer||0,
         ])
-        return res.status(200).json({ title, rows: jsonRows })
+        return res.status(200).json({ title: titleVal, rows: jsonRows })
       }
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
       res.setHeader('Content-Disposition', `attachment; filename="Etat_Charges_${mois}_${p.period_year}.xlsx"`)
@@ -1190,25 +1192,40 @@ export default async function handler(req, res) {
       })
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
       if (req.body.json) {
+        // Recalculer toutes les valeurs localement
+        const jours = (jours_conges_list||[]).filter(j=>j[0]>0)
+        const tauxCongesCalc = taux_conges_auto !== false && jours.length
+          ? jours.reduce((s,j)=>s+(j[0]||0),0)/30
+          : (taux_conges_manuel||0)
+        const indCongesCalc = Math.round(brut * tauxCongesCalc)
+        const totalBrutCalc = brut + indCongesCalc
+        const basePrelevCalc = Math.max(0, totalBrutCalc - 140000)
+        const cnssCalc = Math.round(basePrelevCalc * 0.04)
+        const amuCalc  = Math.round(basePrelevCalc * 0.05)
+        const irppCalc = irpp
+        const totalRetCalc = cnssCalc + amuCalc + irppCalc + (retenues_arrierees||0)
+        const netSoldeCalc = totalBrutCalc - totalRetCalc
+        const moisLabel = departDate.toLocaleDateString('fr-FR',{month:'long'}).toUpperCase()
+        const netFinalCalc = netSoldeCalc - (avance||0) - (retenue_sur_solde||0) - (inclure_preavis?0:(preavis||0))
         return res.status(200).json({
           title: `${emp.last_name} ${emp.first_name} : SOLDE DE TOUT COMPTE`,
           depart: fmt(date_depart),
           embauche: emp.hire_date ? fmt(emp.hire_date) : '',
           fin_contrat: fmt(date_fin_contrat || date_depart),
-          anciennete: ancData ? ancData.label : '',
-          net_payer: netFinal,
+          anciennete: ann <= 0 ? '0 an' : ann === 1 ? '1 an' : `${ann} ans`,
+          net_payer: netFinalCalc,
           lignes: [
-            { label: salaireMoisLabel, montant: brut },
-            { label: 'INDEMNITE DE CONGES ACQUIS NON JOUIR', base: baseConges, taux: tauxConges, montant: indConges },
-            { label: 'TOTAL BRUT SOLDE DE TOUT COMPTE', montant: totalBrut },
-            { label: 'CNSS (4%)', base: Math.max(0,totalBrut-140000), taux: '4%', montant: cnssVal },
-            { label: 'AMU (5%)', base: Math.max(0,totalBrut-140000), taux: '5%', montant: amuVal },
-            { label: 'IRPP', montant: irppVal },
+            { label: `SALAIRE MOIS DE ${moisLabel}`, montant: brut },
+            { label: 'INDEMNITE DE CONGES ACQUIS NON JOUIR', base: brut, taux: tauxCongesCalc.toFixed(4), montant: indCongesCalc },
+            { label: 'TOTAL BRUT SOLDE DE TOUT COMPTE', montant: totalBrutCalc },
+            { label: 'CNSS (4%)', base: basePrelevCalc, taux: '4%', montant: cnssCalc },
+            { label: 'AMU (5%)', base: basePrelevCalc, taux: '5%', montant: amuCalc },
+            { label: 'IRPP', montant: irppCalc },
             ...(retenues_arrierees ? [{ label: 'RETENUES ARRIEREES', montant: retenues_arrierees }] : []),
-            { label: 'TOTAL DES RETENUES', montant: totalRetenues },
-            { label: 'SALAIRE NET SOLDE DE TOUT COMPTE', montant: netSolde },
-            ...(inclure_preavis ? [{ label: 'MONTANT DU PREAVIS', montant: preavis }] : []),
-            { label: 'AVANCE SUR SOLDE DE TOUT COMPTE', montant: avance },
+            { label: 'TOTAL DES RETENUES', montant: totalRetCalc },
+            { label: 'SALAIRE NET SOLDE DE TOUT COMPTE', montant: netSoldeCalc },
+            ...(inclure_preavis ? [{ label: 'MONTANT DU PREAVIS', montant: preavis||0 }] : []),
+            { label: 'AVANCE SUR SOLDE DE TOUT COMPTE', montant: avance||0 },
             ...(retenue_sur_solde ? [{ label: 'RETENUE SUR SOLDE DE TOUT COMPTE', montant: retenue_sur_solde }] : []),
           ],
         })

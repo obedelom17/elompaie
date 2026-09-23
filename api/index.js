@@ -474,7 +474,13 @@ function genBulletin(wb, sheetName, data) {
   ws.getCell(`A${netRow}`).border    = { left:dbl(), right:thin(), top:thin(), bottom:dbl() }
   ws.getRow(netRow).height = 15.75
   // F: net a payer — ref: =F38 (net légal directement si avance=0, sinon =F38-E40)
-  const netPayVal = netLegalVal - avanceVal
+  const avanceVal    = data.avance_salaire || 0
+  const cnssVal      = Math.round(brutTotal * 0.04)
+  const amuVal       = Math.round(brutTotal * 0.05)
+  const patronalVal  = Math.round(brutTotal * 0.175)
+  const irppVal      = data.irpp || 0
+  const netLegalVal  = brutTotal - cnssVal - amuVal - irppVal
+  const netPayVal    = netLegalVal - avanceVal
   ws.getCell(`F${netRow}`).value  = data.avance_salaire
     ? { formula:`F${netLegalRow}-E${autRow}`, result: netPayVal }
     : { formula:`F${netLegalRow}`, result: netPayVal }

@@ -4,13 +4,13 @@
 
 const IRPP_TRANCHES = [
   [0, 900_000, 0.00],
-  [900_001, 3_000_000, 0.03],
-  [3_000_001, 6_000_000, 0.10],
-  [6_000_001, 9_000_000, 0.15],
-  [9_000_001, 12_000_000, 0.20],
-  [12_000_001, 15_000_000, 0.25],
-  [15_000_001, 20_000_000, 0.30],
-  [20_000_001, Infinity, 0.35],
+  [900_000, 3_000_000, 0.03],
+  [3_000_000, 6_000_000, 0.10],
+  [6_000_000, 9_000_000, 0.15],
+  [9_000_000, 12_000_000, 0.20],
+  [12_000_000, 15_000_000, 0.25],
+  [15_000_000, 20_000_000, 0.30],
+  [20_000_000, Infinity, 0.35],
 ]
 
 export function calcIrppAnnuel(revenu) {
@@ -56,6 +56,8 @@ export function calcBrut(vars) {
     + (vars.indemnite_transport || 0)
 }
 
+// RICF Togo (CGI art. 82) : 10 000 F/enfant à charge (max 6 enfants)
+// Le conjoint n'est PAS inclus dans le RICF mensuel
 export function calcPersonnesCharge(maritalStatus, children) {
-  return (maritalStatus === 'marie' ? 1 : 0) + (children || 0)
+  return Math.min(children || 0, 6)
 }

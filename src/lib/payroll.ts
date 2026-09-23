@@ -17,10 +17,14 @@ export interface PayrollInput {
   flat_deduction: number
   marital_status: string
   children_count: number
+  // Indemnité enceinte (CGT Togo art. 146) — non soumise CNSS/AMU/IRPP
+  indemnite_enceinte?: number
 }
 
 export interface PayrollResult {
   gross_salary: number
+  gross_salary_cotisable: number
+  indemnite_enceinte: number
   cnss_employee: number
   amu_employee: number
   abattement_28: number
@@ -58,9 +62,10 @@ const ITS_BRACKETS = [
   { min: 20_000_000, max: Infinity,   rate: 0.35 },
 ]
 
+// RICF Togo (CGI art. 82) : 10 000 F/enfant à charge (max 6 enfants)
+// Le conjoint n'est PAS inclus dans le RICF mensuel
 export function getPersonnesACharge(maritalStatus: string, childrenCount: number): number {
-  let p = maritalStatus === 'marie' ? 1 : 0
-  return p + Math.min(childrenCount, 6)
+  return Math.min(childrenCount, 6)
 }
 
 function calcItsBrutAnnual(revenu: number): number {
@@ -106,7 +111,10 @@ export function calculatePayroll(input: PayrollInput): PayrollResult {
     ? calcOvertimePay(input.base_salary, input.overtime_hours, input.overtime_rate || 'h1')
     : 0
 
-  const gross_salary =
+  // Indemnité enceinte : exonérée CNSS, AMU et IRPP (CGT Togo art. 146)
+  const indemnite_enceinte = input.indemnite_enceinte || 0
+
+  const gross_salary_cotisable =
     (input.base_salary        || 0) +
     overtime_amount +
     (input.overtime_premium   || 0) +
@@ -118,11 +126,13 @@ export function calculatePayroll(input: PayrollInput): PayrollResult {
     (input.thirteenth_month   || 0) +
     (input.exceptional_bonus  || 0)
 
-  const cnss_employee = Math.round(gross_salary * CNSS_EMPLOYEE_RATE)
-  const amu_employee = Math.round(gross_salary * AMU_EMPLOYEE_RATE)
+  const gross_salary = gross_salary_cotisable + indemnite_enceinte
 
-  // Salaire brut imposable (après CNSS 4% + AMU 5%)
-  const brutImposable  = gross_salary - cnss_employee - amu_employee - (input.flat_deduction || 0)
+  const cnss_employee = Math.round(gross_salary_cotisable * CNSS_EMPLOYEE_RATE)
+  const amu_employee = Math.round(gross_salary_cotisable * AMU_EMPLOYEE_RATE)
+
+  // Salaire brut imposable (après CNSS 4% + AMU 5%) — indemnité enceinte exclue
+  const brutImposable  = gross_salary_cotisable - cnss_employee - amu_employee - (input.flat_deduction || 0)
   // Annualisation
   const revenuAnnuel   = brutImposable * 12
   const baseAbat       = Math.min(revenuAnnuel, 10_000_000)
@@ -145,11 +155,12 @@ export function calculatePayroll(input: PayrollInput): PayrollResult {
     (input.salary_advance || 0) + (input.loan_payment || 0)
 
   const net_payable    = gross_salary - total_deductions
-  const cnss_employer  = Math.round(gross_salary * CNSS_EMPLOYER_RATE)
-  const amu_employer  = Math.round(gross_salary * AMU_EMPLOYER_RATE)
+  const cnss_employer  = Math.round(gross_salary_cotisable * CNSS_EMPLOYER_RATE)
+  const amu_employer  = Math.round(gross_salary_cotisable * AMU_EMPLOYER_RATE)
 
   return {
-    gross_salary, cnss_employee, amu_employee,
+    gross_salary, gross_salary_cotisable, indemnite_enceinte,
+    cnss_employee, amu_employee,
     abattement_28, charges_famille,
     taxable_income_annual: revImposable,
     taxable_income_monthly: Math.round(revImposable / 12),

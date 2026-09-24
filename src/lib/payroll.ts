@@ -18,13 +18,13 @@ export interface PayrollInput {
   marital_status: string
   children_count: number
   // Indemnité enceinte (CGT Togo art. 146) — non soumise CNSS/AMU/IRPP
-  indemnite_enceinte?: number
+  indemnite_grossesse?: number
 }
 
 export interface PayrollResult {
   gross_salary: number
   gross_salary_cotisable: number
-  indemnite_enceinte: number
+  indemnite_grossesse: number
   cnss_employee: number
   amu_employee: number
   abattement_28: number
@@ -112,7 +112,7 @@ export function calculatePayroll(input: PayrollInput): PayrollResult {
     : 0
 
   // Indemnité enceinte : exonérée CNSS, AMU et IRPP (CGT Togo art. 146)
-  const indemnite_enceinte = input.indemnite_enceinte || 0
+  const indemnite_grossesse = input.indemnite_grossesse || 0
 
   const gross_salary_cotisable =
     (input.base_salary        || 0) +
@@ -126,7 +126,7 @@ export function calculatePayroll(input: PayrollInput): PayrollResult {
     (input.thirteenth_month   || 0) +
     (input.exceptional_bonus  || 0)
 
-  const gross_salary = gross_salary_cotisable + indemnite_enceinte
+  const gross_salary = gross_salary_cotisable + indemnite_grossesse
 
   const cnss_employee = Math.round(gross_salary_cotisable * CNSS_EMPLOYEE_RATE)
   const amu_employee = Math.round(gross_salary_cotisable * AMU_EMPLOYEE_RATE)
@@ -159,7 +159,7 @@ export function calculatePayroll(input: PayrollInput): PayrollResult {
   const amu_employer  = Math.round(gross_salary_cotisable * AMU_EMPLOYER_RATE)
 
   return {
-    gross_salary, gross_salary_cotisable, indemnite_enceinte,
+    gross_salary, gross_salary_cotisable, indemnite_grossesse,
     cnss_employee, amu_employee,
     abattement_28, charges_famille,
     taxable_income_annual: revImposable,

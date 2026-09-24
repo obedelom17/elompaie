@@ -967,9 +967,10 @@ export default async function handler(req, res) {
       const v = rows[0]
       const MOIS = ['JANVIER','FEVRIER','MARS','AVRIL','MAI','JUIN','JUILLET','AOUT','SEPTEMBRE','OCTOBRE','NOVEMBRE','DECEMBRE']
       const mois = MOIS[(v.period_month||1)-1]
-      const brut = calcBrut(v)
+      const brutCotisable = calcBrut(v) - (v.indemnite_grossesse || 0)  // base CNSS/AMU/IRPP
+      const brut = calcBrut(v)                                           // brut total affiché
       const pers = calcPersonnesCharge(v.marital_status, v.children_count)
-      const irpp = calcIrppMensuel(brut, pers)
+      const irpp = calcIrppMensuel(brutCotisable, pers)
 
       const rubriques = []
       if (v.base_salary)         rubriques.push({ label:'Salaire de Base',        base:v.base_salary,        taux_ou_nb:30 })
@@ -983,6 +984,7 @@ export default async function handler(req, res) {
       if (v.indemnite_transport)     rubriques.push({ label:'Indemnité de Transport',    base:v.indemnite_transport,     taux_ou_nb:30 })
       if (v.indemnite_repas)         rubriques.push({ label:'Indemnité de repas',        base:v.indemnite_repas,         taux_ou_nb:30 })
       if (v.indemnite_communication) rubriques.push({ label:'Indemnité de communication',base:v.indemnite_communication, taux_ou_nb:30 })
+      if (v.indemnite_grossesse)     rubriques.push({ label:'Indemnité de grossesse (exo.)', base:v.indemnite_grossesse, taux_ou_nb:30 })
 
       let logoBuffer = null
       if (v.logo_url) {
@@ -992,8 +994,8 @@ export default async function handler(req, res) {
         } catch {}
       }
 
-      // IRPP: brut imposable = brut × (1 - 4% - 5%), annualisé puis régularisé
-      const brutImposableMensuel = brut * (1 - 0.04 - 0.05)
+      // IRPP: brut imposable = brutCotisable × (1 - 4% - 5%), annualisé puis régularisé
+      const brutImposableMensuel = brutCotisable * (1 - 0.04 - 0.05)
       const revenuAnnuel = brutImposableMensuel * 12
       const abattement = Math.min(revenuAnnuel, 10_000_000) * 0.28
       const chargesFamille = pers * 10_000 * 12
@@ -1093,17 +1095,18 @@ export default async function handler(req, res) {
       const MOIS = ['JANVIER','FEVRIER','MARS','AVRIL','MAI','JUIN','JUILLET','AOUT','SEPTEMBRE','OCTOBRE','NOVEMBRE','DECEMBRE']
       const mois = MOIS[(p.period_month||1)-1]
       const employes = rows.map(v => {
+        const brutCotisable = calcBrut(v) - (v.indemnite_grossesse || 0)
         const brut = calcBrut(v)
         const pers = calcPersonnesCharge(v.marital_status, v.children_count)
-        const irpp = calcIrppMensuel(brut, pers)
-        const net  = brut - Math.round(brut*0.04) - Math.round(brut*0.05) - irpp
+        const irpp = calcIrppMensuel(brutCotisable, pers)
+        const net  = brut - Math.round(brutCotisable*0.04) - Math.round(brutCotisable*0.05) - irpp
                    - (v.avance_salaire||0) - (v.remboursement_pret||0) - (v.deduction_forfaitaire||0)
         return {
           nom: `${v.last_name} ${v.first_name}`,
           responsable: v.responsable || '',
           poste: v.position || '',
           pole: v.pole || '',
-          brut_imposable: brut,
+          brut_imposable: brutCotisable,
           irpp,
           net_payer: Math.round(net),
           regularisation_irpp: v.regularisation_irpp || 0,
@@ -1167,9 +1170,10 @@ export default async function handler(req, res) {
         const vRows = await db`SELECT * FROM payroll_variables WHERE period_id=${period_id} AND employee_id=${employee_id}`
         vars = vRows[0] || null
       }
+      const brutCotisable = vars ? calcBrut(vars) - (vars.indemnite_grossesse || 0) : 0
       const brut = vars ? calcBrut(vars) : 0
       const pers = calcPersonnesCharge(emp.marital_status, emp.children_count)
-      const irpp = calcIrppMensuel(brut, pers) + (regularisation_irpp||0)
+      const irpp = calcIrppMensuel(brutCotisable, pers) + (regularisation_irpp||0)
       const departDate = new Date(date_depart || Date.now())
       const hireDate   = emp.hire_date ? new Date(emp.hire_date) : null
       const ann = hireDate ? Math.floor((departDate-hireDate)/(1000*60*60*24*365)) : 0
@@ -1640,14 +1644,17 @@ async function handleExportBordereau(req, res, type) {
   const MOIS = ['JANVIER','FEVRIER','MARS','AVRIL','MAI','JUIN','JUILLET','AOUT','SEPTEMBRE','OCTOBRE','NOVEMBRE','DECEMBRE']
   const mois = MOIS[(p.period_month||1)-1]
   const annee = p.period_year || ''
-  const employes = rows.map(v => ({
-    nom: `${v.last_name} ${v.first_name}`,
-    n_assure: v.social_security_number || '',
-    brut: calcBrut(v),
-    brut_imposable: Math.round(calcBrut(v) * 0.91),
-    irpp: calcIrppMensuel(calcBrut(v), calcPersonnesCharge(v.marital_status, v.children_count)),
-    regularisation: v.regularisation_irpp || 0,
-  }))
+  const employes = rows.map(v => {
+    const brutCotisable = calcBrut(v) - (v.indemnite_grossesse || 0)
+    return {
+      nom: `${v.last_name} ${v.first_name}`,
+      n_assure: v.social_security_number || '',
+      brut: calcBrut(v),
+      brut_imposable: Math.round(brutCotisable * 0.91),
+      irpp: calcIrppMensuel(brutCotisable, calcPersonnesCharge(v.marital_status, v.children_count)),
+      regularisation: v.regularisation_irpp || 0,
+    }
+  })
 
   const wb2 = new ExcelJS.Workbook()
   let filename = ''
@@ -1669,7 +1676,8 @@ async function handleExportBordereau(req, res, type) {
 // ─── SALARY GRID SUGGESTION ───────────────────────────────────────────────────
 async function handleGridSuggestion(req, res) {
   await requireAuth(req)
-  const { client_id, category } = req.query || {}
+  const qp = Object.fromEntries(new URL(req.url, 'http://x').searchParams)
+  const { client_id, category } = qp
   if (!client_id || !category) return res.status(400).json({ error: 'client_id et category requis' })
   const db = neon(DB_URL())
   const rows = await db`

@@ -66,6 +66,7 @@ export default function ExportPage() {
           flat_deduction: v.flat_deduction || v.deduction_forfaitaire || 0,
           marital_status: v.marital_status || 'celibataire',
           children_count: v.children_count || 0,
+          indemnite_grossesse: v.indemnite_grossesse || 0,
         }
         const result = calculatePayroll(input)
         await generateBulletinPDF({ employee: v, period, variables: input, result, orgName: period.client_name || '' })

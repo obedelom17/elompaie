@@ -54,6 +54,7 @@ export function calcBrut(vars) {
     + (vars.indemnite_logement || 0)
     + (vars.indemnite_repas || 0)
     + (vars.indemnite_transport || 0)
+    + (vars.indemnite_grossesse || 0)  // exonérée CNSS/AMU/IRPP (CGT art. 146)
 }
 
 // RICF Togo (CGI art. 82) : 10 000 F/enfant à charge (max 6 enfants)

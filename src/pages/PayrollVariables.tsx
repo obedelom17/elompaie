@@ -7,7 +7,7 @@ import { ArrowLeft, Calculator, FileText, Save, Lock, Loader2, Search, Info, Dow
 
 interface Employee { id: string; first_name: string; last_name: string; matricule: string|null; position: string|null; category: string|null; marital_status: string; children_count: number; client_id: string; email: string|null; phone: string|null; social_security_number: string|null; hire_date: string|null; client_name?: string }
 
-const EMPTY_VARS = { base_salary: 0, overtime_premium: 0, function_allowance: 0, communication_allowance: 0, housing_premium: 0, meal_premium: 0, transport_allowance: 0, salary_advance: 0, loan_payment: 0, flat_deduction: 0, indemnite_enceinte: 0 }
+const EMPTY_VARS = { base_salary: 0, overtime_premium: 0, function_allowance: 0, communication_allowance: 0, housing_premium: 0, meal_premium: 0, transport_allowance: 0, salary_advance: 0, loan_payment: 0, flat_deduction: 0, indemnite_grossesse: 0 }
 
 export default function PayrollVariables() {
   const { periodId } = useParams<{ periodId: string }>()
@@ -47,8 +47,35 @@ export default function PayrollVariables() {
     setSelectedEmpId(emp.id)
     const existing = variables.get(emp.id)
     if (existing) {
-      setForm({ base_salary: existing.base_salary||0, overtime_premium: existing.overtime_premium||0, function_allowance: existing.function_allowance||0, communication_allowance: existing.communication_allowance||0, housing_premium: existing.housing_premium||0, meal_premium: existing.meal_premium||0, transport_allowance: existing.transport_allowance||0, salary_advance: existing.salary_advance||0, loan_payment: existing.loan_payment||0, flat_deduction: existing.flat_deduction||0, indemnite_enceinte: existing.indemnite_enceinte||0 })
-      setResult(calculatePayroll({ ...existing, marital_status: emp.marital_status, children_count: emp.children_count }))
+      setForm({
+        base_salary:             existing.base_salary            || 0,
+        overtime_premium:        existing.sursalaire             || 0,
+        function_allowance:      existing.indemnite_fonction     || 0,
+        communication_allowance: existing.indemnite_communication|| 0,
+        housing_premium:         existing.indemnite_logement     || 0,
+        meal_premium:            existing.indemnite_repas        || 0,
+        transport_allowance:     existing.indemnite_transport    || 0,
+        salary_advance:          existing.avance_salaire         || 0,
+        loan_payment:            existing.remboursement_pret     || 0,
+        flat_deduction:          existing.deduction_forfaitaire  || 0,
+        indemnite_grossesse:     existing.indemnite_grossesse    || 0,
+      })
+      const mappedForCalc = {
+        base_salary:             existing.base_salary            || 0,
+        overtime_premium:        existing.sursalaire             || 0,
+        function_allowance:      existing.indemnite_fonction     || 0,
+        communication_allowance: existing.indemnite_communication|| 0,
+        housing_premium:         existing.indemnite_logement     || 0,
+        meal_premium:            existing.indemnite_repas        || 0,
+        transport_allowance:     existing.indemnite_transport    || 0,
+        salary_advance:          existing.avance_salaire         || 0,
+        loan_payment:            existing.remboursement_pret     || 0,
+        flat_deduction:          existing.deduction_forfaitaire  || 0,
+        indemnite_grossesse:     existing.indemnite_grossesse    || 0,
+        marital_status:          emp.marital_status,
+        children_count:          emp.children_count,
+      }
+      setResult(calculatePayroll(mappedForCalc))
     } else { setForm(EMPTY_VARS); setResult(null) }
   }
 
@@ -76,7 +103,7 @@ export default function PayrollVariables() {
       avance_salaire: form.salary_advance || 0,
       remboursement_pret: form.loan_payment || 0,
       deduction_forfaitaire: form.flat_deduction || 0,
-      indemnite_enceinte: form.indemnite_enceinte || 0,
+      indemnite_grossesse: form.indemnite_grossesse || 0,
     }
     const saved = await payrollApi.saveVariables(payload)
     const newMap = new Map(variables)
@@ -186,7 +213,7 @@ export default function PayrollVariables() {
                     { key: 'meal_premium', label: 'Prime repas' }, { key: 'transport_allowance', label: 'Ind. transport' },
                     { key: 'flat_deduction', label: 'Déduction forfaitaire' }, { key: 'salary_advance', label: 'Avance salaire' },
                     { key: 'loan_payment', label: 'Remb. prêt' },
-                    { key: 'indemnite_enceinte', label: 'Ind. enceinte' },
+                    { key: 'indemnite_grossesse', label: 'Ind. enceinte' },
                   ].map(({ key, label }) => (
                     <div key={key}>
                       <label className="label">{label}</label>
@@ -217,7 +244,7 @@ export default function PayrollVariables() {
                   </div>
                   <div className="space-y-1">
                     <ResultRow label="Salaire brut" value={result.gross_salary} />
-                    {result.indemnite_enceinte > 0 && <ResultRow label="  dont ind. enceinte (exo.)" value={result.indemnite_enceinte} muted />}
+                    {result.indemnite_grossesse > 0 && <ResultRow label="  dont ind. enceinte (exo.)" value={result.indemnite_grossesse} muted />}
                     <ResultRow label="CNSS salarié (4%)" value={-result.cnss_employee} negative />
                     <ResultRow label="AMU salarié (5%)" value={-result.amu_employee} negative />
                     <ResultRow label="Abattement 28%" value={-result.abattement_28} negative muted />

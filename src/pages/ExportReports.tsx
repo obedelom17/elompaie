@@ -149,6 +149,7 @@ export default function ExportReports() {
       flat_deduction:            Number(vars.flat_deduction     || vars.deduction_forfaitaire)|| 0,
       marital_status:            emp.marital_status  || vars.marital_status  || 'celibataire',
       children_count:            Number(emp.children_count ?? vars.children_count)            || 0,
+      indemnite_grossesse:       Number(vars.indemnite_grossesse) || 0,
     }
     // Stocker anciennete séparément pour l'affichage dans le bulletin
     const ancienneteVal = anciennete

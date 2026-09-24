@@ -6,7 +6,7 @@ const EMPTY: PayrollInput = {
   base_salary: 0, overtime_premium: 0, function_allowance: 0,
   communication_allowance: 0, housing_premium: 0, meal_premium: 0, transport_allowance: 0,
   salary_advance: 0, loan_payment: 0, flat_deduction: 0,
-  marital_status: 'celibataire', children_count: 0, indemnite_enceinte: 0,
+  marital_status: 'celibataire', children_count: 0, indemnite_grossesse: 0,
 }
 
 type Tab = 'bulletin' | 'severance' | 'compare'
@@ -117,7 +117,7 @@ export default function Simulator() {
                     { k: 'flat_deduction', l: 'Déduction forfaitaire' },
                     { k: 'salary_advance', l: 'Avance sur salaire' },
                     { k: 'loan_payment', l: 'Remboursement prêt' },
-                    { k: 'indemnite_enceinte', l: 'Ind. enceinte (exo.)' },
+                    { k: 'indemnite_grossesse', l: 'Ind. enceinte (exo.)' },
                   ].map(({ k, l }) => (
                     <div key={k}>
                       <label className="label">{l}</label>
@@ -163,7 +163,7 @@ export default function Simulator() {
 
               <div className="space-y-2 text-sm">
                 <Row l="Salaire brut" v={result.gross_salary} />
-                {result.indemnite_enceinte > 0 && <Row l="  dont ind. enceinte (exo.)" v={result.indemnite_enceinte} muted />}
+                {result.indemnite_grossesse > 0 && <Row l="  dont ind. enceinte (exo.)" v={result.indemnite_grossesse} muted />}
                 <Row l="CNSS salarié (4%)" v={result.cnss_employee} neg />
                 <Row l="AMU salarié (5%)" v={result.amu_employee} neg />
                 <Row l="Abattement 28%" v={result.abattement_28} neg muted />

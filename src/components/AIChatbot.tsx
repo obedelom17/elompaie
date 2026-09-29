@@ -230,7 +230,9 @@ Instructions :
 - TOUJOURS utiliser chercher_employe quand on parle d'un employé spécifique
 - Réponds en français, sois concis et pratique
 - Formate les montants en FCFA avec séparateurs de milliers
-- Si tu utilises un outil, commente les résultats clairement`
+- Si tu utilises un outil, commente les résultats clairement
+- TOUJOURS présenter les résultats de calcul de paie sous forme de tableau Markdown avec colonnes | Poste | Montant |
+- Les tableaux doivent avoir une ligne de séparation --- et les montants alignés à droite`
 
 // ─── Rendu du message tool call ───────────────────────────────────────────────
 function ToolCallBadge({ call }: { call: ToolCall }) {
@@ -384,9 +386,31 @@ export function AIChatbot() {
   }])
 
   function renderContent(content: string) {
-    return content
-      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\n/g, '<br/>')
+    const lines = content.split('\n')
+    const html: string[] = []
+    let i = 0
+    while (i < lines.length) {
+      const line = lines[i]
+      // Détection tableau Markdown : ligne avec | et ligne suivante avec ---
+      if (line.trim().startsWith('|') && lines[i + 1]?.trim().startsWith('|') && lines[i + 1]?.includes('---')) {
+        html.push('<table class="w-full border-collapse text-sm my-2">')
+        // En-tête
+        const headers = line.split('|').filter((_, idx, arr) => idx > 0 && idx < arr.length - 1)
+        html.push('<thead><tr>' + headers.map(h => `<th class="border border-slate-200 bg-slate-50 px-3 py-1.5 text-left font-semibold">${h.trim()}</th>`).join('') + '</tr></thead>')
+        i += 2 // skip header + separator
+        html.push('<tbody>')
+        while (i < lines.length && lines[i].trim().startsWith('|')) {
+          const cells = lines[i].split('|').filter((_, idx, arr) => idx > 0 && idx < arr.length - 1)
+          html.push('<tr>' + cells.map(c => `<td class="border border-slate-200 px-3 py-1.5">${c.trim().replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')}</td>`).join('') + '</tr>')
+          i++
+        }
+        html.push('</tbody></table>')
+      } else {
+        html.push(line.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>') + '<br/>')
+        i++
+      }
+    }
+    return html.join('')
   }
 
   // ─── Bouton flottant ──────────────────────────────────────────────────────

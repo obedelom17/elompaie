@@ -24,7 +24,11 @@ interface ToolResult {
 }
 
 const GROQ_KEY = import.meta.env.VITE_GROQ_API_KEY || ''
-const MODEL = 'llama-3.3-70b-versatile'
+const MODELS = [
+  'meta-llama/llama-4-scout-17b-16e-instruct',
+  'llama3-70b-8192',
+  'llama-3.1-8b-instant',
+]
 
 // ─── Définitions des outils ───────────────────────────────────────────────────
 const TOOLS = [
@@ -287,6 +291,24 @@ export function AIChatbot() {
     setInput('')
     setLoading(true)
 
+    // Helper: essayer les modèles en cascade jusqu'à succès
+    const groqFetch = async (payload: object): Promise<any> => {
+      let lastErr = ''
+      for (const model of MODELS) {
+        const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_KEY}` },
+          body: JSON.stringify({ ...payload, model }),
+        })
+        if (res.ok) return res.json()
+        const e = await res.json()
+        lastErr = e.error?.message || `Erreur ${res.status}`
+        // Si erreur auth/quota → arrêter (pas la peine d'essayer d'autres modèles)
+        if (res.status === 401 || res.status === 429) throw new Error(lastErr)
+      }
+      throw new Error(lastErr)
+    }
+
     try {
       // Construire le contexte pour Groq
       const groqMessages = [
@@ -294,14 +316,10 @@ export function AIChatbot() {
         ...history.map(m => ({ role: m.role, content: m.content })),
       ]
 
+      const basePayload = { messages: groqMessages, tools: TOOLS, tool_choice: 'auto', temperature: 0.5, max_tokens: 1500 }
+
       // 1ère requête
-      let res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_KEY}` },
-        body: JSON.stringify({ model: MODEL, messages: groqMessages, tools: TOOLS, tool_choice: 'auto', temperature: 0.5, max_tokens: 1500 }),
-      })
-      if (!res.ok) { const e = await res.json(); throw new Error(e.error?.message || `Erreur ${res.status}`) }
-      let data = await res.json()
+      let data = await groqFetch(basePayload)
       let choice = data.choices?.[0]
 
       // ─── Boucle tool calling ──────────────────────────────────────────────
@@ -344,13 +362,7 @@ export function AIChatbot() {
         }
 
         // 2ème requête avec résultats
-        res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_KEY}` },
-          body: JSON.stringify({ model: MODEL, messages: groqMessages, tools: TOOLS, tool_choice: 'auto', temperature: 0.5, max_tokens: 1500 }),
-        })
-        if (!res.ok) { const e = await res.json(); throw new Error(e.error?.message || `Erreur ${res.status}`) }
-        data = await res.json()
+        data = await groqFetch({ ...basePayload, messages: groqMessages })
         choice = data.choices?.[0]
       }
 

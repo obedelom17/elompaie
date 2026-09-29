@@ -23,12 +23,7 @@ interface ToolResult {
   content: string
 }
 
-const GROQ_KEY = import.meta.env.VITE_GROQ_API_KEY || ''
-const MODELS = [
-  'meta-llama/llama-4-scout-17b-16e-instruct',
-  'llama3-70b-8192',
-  'llama-3.1-8b-instant',
-]
+// Groq appelé via backend /api/ai-chat (clé privée GROQ_API_KEY côté serveur)
 
 // ─── Définitions des outils ───────────────────────────────────────────────────
 const TOOLS = [
@@ -291,22 +286,19 @@ export function AIChatbot() {
     setInput('')
     setLoading(true)
 
-    // Helper: essayer les modèles en cascade jusqu'à succès
+    // Helper: appel via backend (clé privée GROQ_API_KEY côté serveur)
     const groqFetch = async (payload: object): Promise<any> => {
-      let lastErr = ''
-      for (const model of MODELS) {
-        const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_KEY}` },
-          body: JSON.stringify({ ...payload, model }),
-        })
-        if (res.ok) return res.json()
+      const res = await fetch('/api/ai-chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload),
+      })
+      if (!res.ok) {
         const e = await res.json()
-        lastErr = e.error?.message || `Erreur ${res.status}`
-        // Si erreur auth/quota → arrêter (pas la peine d'essayer d'autres modèles)
-        if (res.status === 401 || res.status === 429) throw new Error(lastErr)
+        throw new Error(e.error || `Erreur ${res.status}`)
       }
-      throw new Error(lastErr)
+      return res.json()
     }
 
     try {
@@ -373,7 +365,7 @@ export function AIChatbot() {
     } catch (e: any) {
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: `Erreur : ${e.message}\n\nVérifiez que VITE_GROQ_API_KEY est configuré dans Vercel.`,
+        content: `Erreur : ${e.message}\n\nVérifiez que GROQ_API_KEY est configuré dans Vercel (Settings → Environment Variables).`,
         ts: Date.now(),
       }])
     } finally {

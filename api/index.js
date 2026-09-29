@@ -1438,6 +1438,36 @@ export default async function handler(req, res) {
     }
 
     // Upload logo
+    // ─── AI CHATBOT (Groq via backend — clé privée) ───────────────────────────
+    if (path === '/api/ai-chat') {
+      if (method !== 'POST') return res.status(405).end()
+      await requireAuth(req)
+      const { messages, tools } = req.body || {}
+      const GROQ_KEY = process.env.GROQ_API_KEY || ''
+      if (!GROQ_KEY) return res.status(500).json({ error: 'GROQ_API_KEY non configuré sur le serveur.' })
+      const MODELS = [
+        'openai/gpt-oss-20b',
+        'meta-llama/llama-4-scout-17b-16e-instruct',
+        'llama3-70b-8192',
+      ]
+      let lastErr = ''
+      for (const model of MODELS) {
+        const gr = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_KEY}` },
+          body: JSON.stringify({ model, messages, tools, tool_choice: tools ? 'auto' : undefined, temperature: 0.5, max_tokens: 1500 }),
+        })
+        if (gr.ok) {
+          const data = await gr.json()
+          return res.status(200).json(data)
+        }
+        const e = await gr.json()
+        lastErr = e.error?.message || `Erreur ${gr.status}`
+        if (gr.status === 401 || gr.status === 429) break
+      }
+      return res.status(500).json({ error: lastErr })
+    }
+
     if (path === '/api/upload-logo') {
       if (method !== 'POST') return res.status(405).end()
       let buffer

@@ -1,3 +1,4 @@
+import { clearApiCache } from '../lib/api'
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
 import { authClient } from '../lib/auth-client'
 import { t } from '../lib/i18n'
@@ -170,6 +171,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const handleSignOut = async () => {
+    clearApiCache()
     try { await (authClient as any).signOut() } catch {}
     setUser(null)
     setOrg(null)

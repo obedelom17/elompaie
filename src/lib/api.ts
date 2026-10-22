@@ -12,20 +12,51 @@ export async function apiFetch(url: string, opts?: RequestInit) {
   return res.json()
 }
 
+// Cache mémoire des lectures : revenir sur une page déjà visitée est instantané.
+// Toute écriture (POST, PUT, PATCH, DELETE) vide le cache pour éviter les données périmées.
+const CACHE_TTL_MS = 60_000
+const cache = new Map<string, { at: number; data: unknown }>()
+const inflight = new Map<string, Promise<unknown>>()
+
+export function clearApiCache() { cache.clear(); inflight.clear() }
+
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
-    method,
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
-    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
-  })
-  if (res.status === 401) {
-    window.location.href = '/auth'
-    throw new Error(t("Session expirée"))
+  const isRead = method === 'GET'
+  if (isRead) {
+    const hit = cache.get(path)
+    if (hit && Date.now() - hit.at < CACHE_TTL_MS) return structuredClone(hit.data) as T
+    const pending = inflight.get(path)
+    if (pending) return structuredClone(await pending) as T
+  } else {
+    clearApiCache()
   }
-  const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
-  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`)
-  return data as T
+
+  const run = (async () => {
+    const res = await fetch(`${BASE}${path}`, {
+      method,
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+    })
+    if (res.status === 401) {
+      clearApiCache()
+      window.location.href = '/auth'
+      throw new Error(t("Session expirée"))
+    }
+    const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`)
+    return data
+  })()
+
+  if (!isRead) return (await run) as T
+  inflight.set(path, run)
+  try {
+    const data = await run
+    cache.set(path, { at: Date.now(), data })
+    return structuredClone(data) as T
+  } finally {
+    inflight.delete(path)
+  }
 }
 
 export const clientsApi = {

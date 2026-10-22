@@ -128,8 +128,8 @@ export default function Employees() {
           <p>{t("Aucun employé trouvé")}</p>
         </div>
       ) : (
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow overflow-hidden">
-          <table className="w-full">
+        <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 overflow-x-auto">
+          <table className="w-full min-w-[720px]">
             <thead className="bg-slate-50 dark:bg-slate-700">
               <tr>
                 {['Employé','Client','Poste','Catégorie','Statut',''].map((h,i)=>(
@@ -200,12 +200,12 @@ export default function Employees() {
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div><label className={labelCls}>{t("Prénom *")}</label><input className={inputCls} value={form.first_name} onChange={e=>setForm({...form,first_name:e.target.value})} /></div>
                 <div><label className={labelCls}>{t("Nom *")}</label><input className={inputCls} value={form.last_name} onChange={e=>setForm({...form,last_name:e.target.value})} /></div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div><label className={labelCls}>{t("Matricule")}</label><input className={inputCls} value={form.matricule||''} onChange={e=>setForm({...form,matricule:e.target.value})} /></div>
                 <div>
                   <label className={labelCls}>{t("Genre")}</label>
@@ -215,7 +215,7 @@ export default function Employees() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className={labelCls}>{t("Catégorie")}</label>
                   <select className={inputCls} value={form.category||''} onChange={e=>setForm({...form,category:e.target.value})}>
@@ -233,12 +233,12 @@ export default function Employees() {
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div><label className={labelCls}>{t("Pôle")}</label><input className={inputCls} placeholder={t("Ex: ADMIN, RH…")} value={form.pole||''} onChange={e=>setForm({...form,pole:e.target.value})} /></div>
                 <div><label className={labelCls}>{t("Responsable")}</label><input className={inputCls} placeholder={t("Nom du responsable")} value={form.responsable||''} onChange={e=>setForm({...form,responsable:e.target.value})} /></div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className={labelCls}>{t("Situation maritale")}</label>
                   <select className={inputCls} value={form.marital_status} onChange={e=>setForm({...form,marital_status:e.target.value})}>
@@ -248,7 +248,7 @@ export default function Employees() {
                 <div><label className={labelCls}>{t("Enfants à charge")}</label><input type="number" min={0} className={inputCls} value={form.children_count === 0 ? '' : form.children_count} placeholder="0" onChange={e=>setForm({...form,children_count:parseInt(e.target.value)||0})} /></div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className={labelCls}>{t("Type de contrat")}</label>
                   <select className={inputCls} value={form.contract_type||'CDI'} onChange={e=>setForm({...form,contract_type:e.target.value})}>
@@ -263,12 +263,12 @@ export default function Employees() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div><label className={labelCls}>{t("Date d'embauche")}</label><input type="date" className={inputCls} value={form.hire_date||''} onChange={e=>setForm({...form,hire_date:e.target.value})} /></div>
                 <div><label className={labelCls}>{t("Date de naissance")}</label><input type="date" className={inputCls} value={form.birth_date||''} onChange={e=>setForm({...form,birth_date:e.target.value})} /></div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div><label className={labelCls}>{t("Téléphone")}</label><input className={inputCls} value={form.phone||''} onChange={e=>setForm({...form,phone:e.target.value})} /></div>
                 <div><label className={labelCls}>{t("Email")}</label><input type="email" className={inputCls} value={form.email||''} onChange={e=>setForm({...form,email:e.target.value})} /></div>
               </div>

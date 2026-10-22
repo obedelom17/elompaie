@@ -401,7 +401,7 @@ export default function ExportReports() {
             <FormatPicker value={sFormat} onChange={setSFormat} />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className={labelCls}>{t("Client")}</label>
               <select className={inputCls} value={sClient} onChange={e=>{setSClient(e.target.value);setSEmployee('');setSPeriod('')}}>
@@ -426,7 +426,7 @@ export default function ExportReports() {
             </select>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div><label className={labelCls}>{t("Date de départ *")}</label><input type="date" className={inputCls} value={sDateDepart} onChange={e=>setSDateDepart(e.target.value)} /></div>
             <div><label className={labelCls}>{t("Fin de contrat")}</label><input type="date" className={inputCls} value={sDateFin} onChange={e=>setSDateFin(e.target.value)} /></div>
           </div>
@@ -454,11 +454,11 @@ export default function ExportReports() {
             {!sTauxAuto&&(<div className="mt-2"><label className={labelCls}>{t("Taux manuel")}</label><input type="number" step="0.001" className={inputCls} value={sTauxManuel === '0' ? '' : sTauxManuel} placeholder="0" onChange={e=>setSTauxManuel(e.target.value)} /></div>)}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div><label className={labelCls}>{t("Avance sur solde (FCFA)")}</label><input type="number" className={inputCls} value={sAvance === '0' ? '' : sAvance} placeholder="0" onChange={e=>setSAvance(e.target.value)} /></div>
             <div><label className={labelCls}>{t("Retenues arriérées (FCFA)")}</label><input type="number" className={inputCls} value={sRetenuesArr === '0' ? '' : sRetenuesArr} placeholder="0" onChange={e=>setSRetenuesArr(e.target.value)} /></div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div><label className={labelCls}>{t("Retenue sur solde (FCFA)")}</label><input type="number" className={inputCls} value={sRetenueSurSolde === '0' ? '' : sRetenueSurSolde} placeholder="0" onChange={e=>setSRetenueSurSolde(e.target.value)} /></div>
             <div><label className={labelCls}>{t("Régularisation IRPP (FCFA)")}</label><input type="number" className={inputCls} value={sRegulIrpp === '0' ? '' : sRegulIrpp} placeholder="0" onChange={e=>setSRegulIrpp(e.target.value)} /></div>
           </div>

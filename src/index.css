@@ -40,11 +40,11 @@
   .badge-purple { @apply badge bg-slate-100 text-slate-700; }
 
   /* Fenêtres modales */
-  .modal-overlay { @apply fixed inset-0 bg-slate-900/50 z-50 flex items-center justify-center p-4; }
-  .modal { @apply bg-white rounded-lg w-full shadow-modal animate-fade-in; }
+  .modal-overlay { @apply fixed inset-0 bg-slate-900/50 z-50 flex items-center justify-center p-3 sm:p-4; }
+  .modal { @apply bg-white rounded-lg w-full max-h-[92dvh] overflow-y-auto shadow-modal animate-fade-in; }
 
   /* Notifications */
-  .toast { @apply fixed bottom-6 right-6 z-[100] flex items-center gap-3 px-4 py-3 rounded-md text-sm font-medium shadow-modal animate-slide-up; }
+  .toast { @apply fixed bottom-4 right-4 left-4 sm:left-auto sm:bottom-6 sm:right-6 z-[100] flex items-center gap-3 px-4 py-3 rounded-md text-sm font-medium shadow-modal animate-slide-up; }
   .toast-success { @apply toast bg-accent-700 text-white; }
   .toast-error { @apply toast bg-red-700 text-white; }
   .toast-info { @apply toast bg-slate-800 text-white; }

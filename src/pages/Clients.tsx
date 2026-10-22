@@ -132,19 +132,19 @@ export default function Clients() {
               </div>
               <div><label className="label">{t("Nom commercial *")}</label><input required value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="input" /></div>
               <div><label className="label">{t("Entité / Raison sociale")}</label><input value={form.entite_name} onChange={e => setForm({...form, entite_name: e.target.value})} className="input" /></div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div><label className="label">{t("N° Employeur CNSS")}</label><input value={form.num_employeur} onChange={e => setForm({...form, num_employeur: e.target.value})} className="input" /></div>
                 <div><label className="label">{t("NIF employeur")}</label><input value={form.nif} onChange={e => setForm({...form, nif: e.target.value})} className="input" /></div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div><label className="label">{t("Adresse / BP")}</label><input value={form.bp} onChange={e => setForm({...form, bp: e.target.value})} className="input" /></div>
                 <div><label className="label">{t("Téléphone")}</label><input value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} className="input" /></div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div><label className="label">{t("Email")}</label><input type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} className="input" /></div>
                 <div><label className="label">{t("Secteur")}</label><input value={form.sector} onChange={e => setForm({...form, sector: e.target.value})} className="input" /></div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div><label className="label">{t("IFU")}</label><input value={form.ifu} onChange={e => setForm({...form, ifu: e.target.value})} className="input" /></div>
                 <div><label className="label">{t("RCCM")}</label><input value={form.rccm} onChange={e => setForm({...form, rccm: e.target.value})} className="input" /></div>
               </div>

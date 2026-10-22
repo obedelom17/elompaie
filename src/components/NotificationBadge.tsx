@@ -41,7 +41,7 @@ export function NotificationBadge() {
       {open && (
         <>
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-12 w-80 bg-white rounded-lg shadow-xl border border-slate-100 z-40 overflow-hidden">
+          <div className="absolute right-0 top-12 w-[calc(100vw-2rem)] max-w-xs sm:w-80 bg-white rounded-lg shadow-xl border border-slate-100 z-40 overflow-hidden">
             <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
               <span className="font-semibold text-slate-900 text-sm">{t("Notifications")}</span>
               <button onClick={() => setOpen(false)} className="p-1 rounded-lg hover:bg-slate-100"><X className="w-4 h-4 text-slate-400" /></button>

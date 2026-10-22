@@ -89,7 +89,7 @@ export default function PayrollPeriods() {
                   {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div><label className="label">{t("Mois *")}</label>
                   <select required value={form.period_month} onChange={e => setForm({...form, period_month: Number(e.target.value)})} className="input">
                     {monthNames().map((n, i) => <option key={i} value={i+1}>{n}</option>)}

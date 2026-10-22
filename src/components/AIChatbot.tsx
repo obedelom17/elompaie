@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
-import { Send, Bot, User, Loader2, Trash2, Wrench } from 'lucide-react'
+import { Send, Loader2, Trash2, Wrench } from 'lucide-react'
+import { LogoMark } from './Logo'
 import { calculatePayroll, formatXOF } from '../lib/payroll'
 import { t, getLang } from '../lib/i18n'
 
@@ -413,7 +414,7 @@ export function AIChatbot() {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-7rem)] lg:h-[calc(100vh-8rem)] max-w-4xl mx-auto">
+    <div className="flex flex-col h-[calc(100dvh-7.5rem)] lg:h-[calc(100dvh-8rem)] max-w-4xl mx-auto">
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">{t("ElomPaie AI")}</h1>
         <button onClick={clear} className="btn-secondary" title={t("Effacer")}>
@@ -426,10 +427,8 @@ export function AIChatbot() {
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
           {messages.map((msg, i) => (
             <div key={i} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
-              <div className={`w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0 ${msg.role === 'user' ? 'bg-slate-100' : 'bg-[#6C63FF]'}`}>
-                {msg.role === 'user' ? <User className="w-4 h-4 text-slate-600" /> : <Bot className="w-4 h-4 text-white" />}
-              </div>
-              <div className="max-w-[80%] space-y-1">
+              {msg.role !== 'user' && <LogoMark size={28} className="flex-shrink-0 mt-0.5" />}
+              <div className="max-w-[88%] sm:max-w-[80%] space-y-1">
                 {msg.toolCalls?.map(tc => <ToolCallBadge key={tc.id} call={tc} />)}
                 {msg.content && (
                   <div
@@ -444,9 +443,7 @@ export function AIChatbot() {
           ))}
           {loading && (
             <div className="flex gap-3">
-              <div className="w-8 h-8 rounded-md bg-[#6C63FF] flex items-center justify-center flex-shrink-0">
-                <Bot className="w-4 h-4 text-white" />
-              </div>
+              <LogoMark size={28} className="flex-shrink-0 mt-0.5" />
               <div className="bg-slate-50 border border-slate-200 px-4 py-3 rounded-lg flex items-center gap-2">
                 <Loader2 className="w-4 h-4 animate-spin text-primary-600" />
                 <span className="text-sm text-slate-500">{t("Réflexion...")}</span>

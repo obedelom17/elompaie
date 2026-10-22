@@ -69,7 +69,7 @@ export default function SalaryGrids() {
       ) : Object.entries(groupedByClient).map(([clientName, clientGrids]) => (
         <div key={clientName} className="card overflow-hidden">
           <div className="px-5 py-3 bg-slate-50 border-b border-slate-200"><h3 className="font-semibold text-slate-900">{clientName}</h3></div>
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto"><table className="w-full text-sm min-w-[560px]">
             <thead><tr className="border-b border-slate-100">
               <th className="text-left py-3 px-5 text-xs font-semibold text-slate-400 uppercase">{t("Catégorie")}</th>
               <th className="text-left py-3 px-5 text-xs font-semibold text-slate-400 uppercase">{t("Échelon")}</th>
@@ -93,7 +93,7 @@ export default function SalaryGrids() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         </div>
       ))}
 
@@ -110,11 +110,11 @@ export default function SalaryGrids() {
                   {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div><label className="label">{t("Catégorie *")}</label><input required value={form.category} onChange={e => setForm({...form, category: e.target.value})} className="input" placeholder={t("Agent · Cadre…")} /></div>
                 <div><label className="label">{t("Échelon")}</label><input type="number" min="1" value={form.echelon} onChange={e => setForm({...form, echelon: Number(e.target.value)})} className="input" /></div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div><label className="label">{t("Salaire de base (F CFA)")}</label><input type="number" min="0" value={form.base_salary || ''} onChange={e => setForm({...form, base_salary: Number(e.target.value)})} className="input" /></div>
                 <div><label className="label">{t("Taux horaire (F CFA)")}</label><input type="number" min="0" value={form.hourly_rate || ''} onChange={e => setForm({...form, hourly_rate: Number(e.target.value)})} className="input" /></div>
               </div>

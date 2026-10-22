@@ -1,3 +1,4 @@
+import { t } from '../lib/i18n'
 const BASE = '/api'
 
 export async function apiFetch(url: string, opts?: RequestInit) {
@@ -5,7 +6,7 @@ export async function apiFetch(url: string, opts?: RequestInit) {
   if (res.status === 401) {
     // Session expirée → rediriger vers /auth
     window.location.href = '/auth'
-    throw new Error('Session expirée')
+    throw new Error(t("Session expirée"))
   }
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   return res.json()
@@ -20,7 +21,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   })
   if (res.status === 401) {
     window.location.href = '/auth'
-    throw new Error('Session expirée')
+    throw new Error(t("Session expirée"))
   }
   const data = await res.json().catch(() => ({ error: `HTTP ${res.status}` }))
   if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`)
@@ -75,8 +76,8 @@ export async function uploadLogo(file: File): Promise<string> {
     },
     body: file,
   })
-  if (res.status === 401) { window.location.href = '/auth'; throw new Error('Session expirée') }
-  if (!res.ok) throw new Error('Erreur upload logo')
+  if (res.status === 401) { window.location.href = '/auth'; throw new Error(t("Session expirée")) }
+  if (!res.ok) throw new Error(t("Erreur upload logo"))
   const data = await res.json()
   return data.url
 }

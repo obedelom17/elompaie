@@ -33,7 +33,7 @@ function ToastItem({ toast, dismiss }: { toast: ToastType; dismiss: (id: string)
   }, [])
 
   return (
-    <div className={`flex items-center gap-3 px-4 py-3 rounded-2xl shadow-modal text-white text-sm font-medium max-w-sm transition-all duration-300 ${styles[toast.type]} ${visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+    <div className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-modal text-white text-sm font-medium max-w-sm transition-all duration-300 ${styles[toast.type]} ${visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
       <Icon className="w-5 h-5 flex-shrink-0" />
       <span className="flex-1">{toast.message}</span>
       <button onClick={() => dismiss(toast.id)} className="p-0.5 rounded-lg hover:bg-white/20 transition-colors">

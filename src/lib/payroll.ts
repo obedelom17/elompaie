@@ -1,3 +1,5 @@
+import { getLang } from './i18n'
+const getLocale = () => (getLang() === 'en' ? 'en-US' : 'fr-FR')
 // Moteur de calcul de paie - Togo
 
 export interface PayrollInput {
@@ -10,6 +12,7 @@ export interface PayrollInput {
   housing_premium: number
   meal_premium: number
   transport_allowance: number
+  seniority_allowance?: number   // Indemnité d'ancienneté (soumise CNSS/AMU/IRPP)
   thirteenth_month?: number      // 13ème mois
   exceptional_bonus?: number     // prime exceptionnelle
   salary_advance: number
@@ -39,6 +42,7 @@ export interface PayrollResult {
   amu_employer: number
   employer_total: number
   overtime_amount: number
+  seniority_allowance: number
   // compat DB
   ricf: number
   taxable_income: number
@@ -106,6 +110,19 @@ export function calcAnciennete(hireDateStr: string | null): { years: number; mon
   }
 }
 
+// Indemnité d'ancienneté = (salaire de base + sursalaire) × taux (%)
+export function calcSeniorityAllowance(baseSalary: number, overSalary: number, ratePct: number): number {
+  return Math.round(((baseSalary || 0) + (overSalary || 0)) * ((ratePct || 0) / 100))
+}
+
+// Taux suggéré à partir de la date d'embauche : 2 % par année complète, à partir de 2 ans.
+// Il s'agit d'une proposition modifiable : le taux réel dépend de la convention collective applicable.
+export function suggestSeniorityRate(hireDateStr: string | null | undefined): number {
+  if (!hireDateStr) return 0
+  const { years } = calcAnciennete(hireDateStr)
+  return years >= 2 ? years * 2 : 0
+}
+
 export function calculatePayroll(input: PayrollInput): PayrollResult {
   const overtime_amount = input.overtime_hours && input.base_salary
     ? calcOvertimePay(input.base_salary, input.overtime_hours, input.overtime_rate || 'h1')
@@ -123,6 +140,7 @@ export function calculatePayroll(input: PayrollInput): PayrollResult {
     (input.housing_premium    || 0) +
     (input.meal_premium       || 0) +
     (input.transport_allowance|| 0) +
+    (input.seniority_allowance || 0) +
     (input.thirteenth_month   || 0) +
     (input.exceptional_bonus  || 0)
 
@@ -168,6 +186,7 @@ export function calculatePayroll(input: PayrollInput): PayrollResult {
     cnss_employer, amu_employer,
     employer_total: cnss_employer + amu_employer,
     overtime_amount,
+    seniority_allowance: input.seniority_allowance || 0,
     ricf: charges_famille,
     taxable_income: Math.round(revImposable / 12),
     irpp_brut_display: irpp_brut,
@@ -192,7 +211,7 @@ export function getPreavisDays(category: string): string {
 }
 
 export function formatXOF(amount: number): string {
-  return new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(Math.round(amount)) + ' F'
+  return new Intl.NumberFormat(getLocale(), { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(Math.round(amount)) + ' F'
 }
 
 export const MONTH_NAMES = [

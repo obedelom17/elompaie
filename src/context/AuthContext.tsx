@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
 import { authClient } from '../lib/auth-client'
+import { t } from '../lib/i18n'
 
 interface OrgInfo { id: string; name: string }
 interface UserInfo { id: string; email: string; name?: string }
@@ -98,9 +99,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (error) {
         const msg = error.message || ''
         if (msg.toLowerCase().includes('invalid') || msg.toLowerCase().includes('credentials') || msg.toLowerCase().includes('password')) {
-          return { error: 'Email ou mot de passe incorrect.' }
+          return { error: t("Email ou mot de passe incorrect.") }
         }
-        return { error: msg || 'Erreur de connexion.' }
+        return { error: msg || t("Erreur de connexion.") }
       }
 
       // 2. Attendre que le cookie soit disponible et vérifier session
@@ -132,7 +133,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { error: null }
 
     } catch (e: any) {
-      return { error: e.message || 'Erreur de connexion.' }
+      return { error: e.message || t("Erreur de connexion.") }
     }
   }
 
@@ -142,12 +143,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data: signUpData, error: signUpError } = await (authClient as any).signUp.email({
         email, password, name: orgName,
       }) || {}
-      if (signUpError) return { error: signUpError.message || 'Erreur inscription.' }
+      if (signUpError) return { error: signUpError.message || t("Erreur inscription.") }
 
       // 2. Connexion automatique
       await sleep(300)
       const { data, error: signInError } = await (authClient as any).signIn.email({ email, password }) || {}
-      if (signInError) return { error: signInError.message || 'Inscription réussie. Connectez-vous.' }
+      if (signInError) return { error: signInError.message || t("Inscription réussie. Connectez-vous.") }
 
       // 3. Vérifier session
       await sleep(500)
@@ -164,7 +165,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       return { error: null }
     } catch (e: any) {
-      return { error: e.message || 'Erreur inscription.' }
+      return { error: e.message || t("Erreur inscription.") }
     }
   }
 

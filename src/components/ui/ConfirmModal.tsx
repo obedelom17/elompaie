@@ -1,4 +1,5 @@
 import { AlertTriangle } from 'lucide-react'
+import { t } from '../../lib/i18n'
 
 interface Props {
   open: boolean
@@ -10,13 +11,13 @@ interface Props {
   onCancel: () => void
 }
 
-export function ConfirmModal({ open, title, message, confirmLabel = 'Confirmer', danger, onConfirm, onCancel }: Props) {
+export function ConfirmModal({ open, title, message, confirmLabel = t("Confirmer"), danger, onConfirm, onCancel }: Props) {
   if (!open) return null
   return (
     <div className="modal-overlay" onClick={onCancel}>
       <div className="modal max-w-md p-6" onClick={e => e.stopPropagation()}>
         <div className="flex items-center gap-4 mb-4">
-          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 ${danger ? 'bg-red-100' : 'bg-amber-100'}`}>
+          <div className={`w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 ${danger ? 'bg-red-100' : 'bg-amber-100'}`}>
             <AlertTriangle className={`w-6 h-6 ${danger ? 'text-red-600' : 'text-amber-600'}`} />
           </div>
           <div>
@@ -25,7 +26,7 @@ export function ConfirmModal({ open, title, message, confirmLabel = 'Confirmer',
           </div>
         </div>
         <div className="flex gap-3 mt-6">
-          <button onClick={onCancel} className="btn-secondary flex-1">Annuler</button>
+          <button onClick={onCancel} className="btn-secondary flex-1">{t("Annuler")}</button>
           <button onClick={onConfirm} className={`flex-1 btn ${danger ? 'btn-danger' : 'btn-primary'}`}>{confirmLabel}</button>
         </div>
       </div>

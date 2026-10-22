@@ -34,7 +34,7 @@ function ToastItem({ toast: t, onClose }: { toast: Toast; onClose: () => void })
   const colors = { success: 'bg-emerald-600', error: 'bg-red-600', info: 'bg-primary-600' }
   const Icon = icons[t.type]
   return (
-    <div className={`flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-modal text-sm font-medium text-white ${colors[t.type]} transition-all duration-300 ${visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+    <div className={`flex items-center gap-3 px-5 py-3.5 rounded-lg shadow-modal text-sm font-medium text-white ${colors[t.type]} transition-all duration-300 ${visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
       <Icon className="w-5 h-5 flex-shrink-0" />
       <span>{t.message}</span>
       <button onClick={onClose} className="ml-2 opacity-70 hover:opacity-100 transition-opacity"><X className="w-4 h-4" /></button>

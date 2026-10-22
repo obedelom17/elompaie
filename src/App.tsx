@@ -14,23 +14,24 @@ import ExportReports from './pages/ExportReports'
 import ActivityLog from './pages/ActivityLog'
 import Settings from './pages/Settings'
 import Layout from './components/Layout'
+import { LogoMark } from './components/Logo'
+import { useLang } from './lib/i18n'
 
 function ProtectedRoutes() {
   const { user, loading } = useAuth()
+  const { lang } = useLang()
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50">
       <div className="flex flex-col items-center gap-4">
-        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center animate-pulse">
-          <span className="text-white text-xl font-black">₣</span>
-        </div>
-        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-600"></div>
+        <LogoMark size={44} />
+        <div className="animate-spin rounded-full h-5 w-5 border-2 border-slate-200 border-t-primary-600"></div>
       </div>
     </div>
   )
   if (!user) return <Navigate to="/auth" replace />
   return (
     <Layout>
-      <Routes>
+      <Routes key={lang}>
         <Route path="/" element={<Dashboard />} />
         <Route path="/clients" element={<Clients />} />
         <Route path="/clients/:id" element={<ClientDetail />} />
@@ -51,14 +52,15 @@ function ProtectedRoutes() {
 
 function AppRoutes() {
   const { user, loading } = useAuth()
+  const { lang } = useLang()
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+      <div className="animate-spin rounded-full h-6 w-6 border-2 border-slate-200 border-t-primary-600"></div>
     </div>
   )
   return (
     <Routes>
-      <Route path="/auth" element={user ? <Navigate to="/" replace /> : <AuthPage />} />
+      <Route path="/auth" element={user ? <Navigate to="/" replace /> : <AuthPage key={lang} />} />
       <Route path="/*" element={<ProtectedRoutes />} />
     </Routes>
   )

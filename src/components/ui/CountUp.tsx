@@ -1,3 +1,4 @@
+import { locale } from '../../lib/i18n'
 import { useEffect, useRef, useState } from 'react'
 
 export function CountUp({ value, duration = 800 }: { value: number; duration?: number }) {
@@ -18,5 +19,5 @@ export function CountUp({ value, duration = 800 }: { value: number; duration?: n
     return () => { if (raf.current) cancelAnimationFrame(raf.current) }
   }, [value, duration])
 
-  return <>{new Intl.NumberFormat('fr-FR').format(display)}</>
+  return <>{new Intl.NumberFormat(locale()).format(display)}</>
 }

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Bell, X, AlertTriangle, CheckCircle2, Info } from 'lucide-react'
 import { employeesApi } from '../lib/api'
+import { t } from '../lib/i18n'
 
 interface Notif { id: string; title: string; body: string; type: 'warning' | 'success' | 'info'; read: boolean }
 
@@ -19,7 +20,7 @@ export function NotificationBadge() {
         if (e.contract_type === 'cdd' && e.contract_end_date) {
           const days = Math.ceil((new Date(e.contract_end_date).getTime() - today) / 86400000)
           if (days >= 0 && days <= 30) {
-            alerts.push({ id: `cdd-${e.id}`, title: 'CDD arrivant à terme', body: `${e.first_name} ${e.last_name} — dans ${days}j`, type: 'warning', read: false })
+            alerts.push({ id: `cdd-${e.id}`, title: t("CDD arrivant à terme"), body: `${e.first_name} ${e.last_name} — dans ${days}j`, type: 'warning', read: false })
           }
         }
       })
@@ -29,25 +30,25 @@ export function NotificationBadge() {
 
   const unread = notifs.filter(n => !n.read).length
   const IconMap = { warning: AlertTriangle, success: CheckCircle2, info: Info }
-  const ColorMap = { warning: 'text-amber-600 bg-amber-50', success: 'text-emerald-600 bg-emerald-50', info: 'text-blue-600 bg-blue-50' }
+  const ColorMap = { warning: 'text-amber-600 bg-amber-50', success: 'text-emerald-600 bg-emerald-50', info: 'text-primary-600 bg-primary-50' }
 
   return (
     <div className="relative">
-      <button onClick={() => setOpen(!open)} className="p-2 rounded-xl hover:bg-slate-100 relative transition-colors">
+      <button onClick={() => setOpen(!open)} className="p-2 rounded-md hover:bg-slate-100 relative transition-colors">
         <Bell className="w-5 h-5 text-slate-600" />
         {unread > 0 && <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">{unread}</span>}
       </button>
       {open && (
         <>
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-12 w-80 bg-white rounded-2xl shadow-xl border border-slate-100 z-40 overflow-hidden">
+          <div className="absolute right-0 top-12 w-80 bg-white rounded-lg shadow-xl border border-slate-100 z-40 overflow-hidden">
             <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
-              <span className="font-semibold text-slate-900 text-sm">Notifications</span>
+              <span className="font-semibold text-slate-900 text-sm">{t("Notifications")}</span>
               <button onClick={() => setOpen(false)} className="p-1 rounded-lg hover:bg-slate-100"><X className="w-4 h-4 text-slate-400" /></button>
             </div>
             <div className="max-h-72 overflow-y-auto">
               {notifs.length === 0 ? (
-                <div className="text-center py-8"><Bell className="w-8 h-8 text-slate-200 mx-auto mb-2" /><p className="text-slate-400 text-sm">Aucune notification</p></div>
+                <div className="text-center py-8"><Bell className="w-8 h-8 text-slate-200 mx-auto mb-2" /><p className="text-slate-400 text-sm">{t("Aucune notification")}</p></div>
               ) : notifs.map(n => {
                 const Icon = IconMap[n.type]
                 return (

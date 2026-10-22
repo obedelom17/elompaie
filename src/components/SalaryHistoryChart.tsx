@@ -3,7 +3,8 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Legend
 } from 'recharts'
-import { MONTH_NAMES, formatXOF } from '../lib/payroll'
+import { formatXOF } from '../lib/payroll'
+import { t, monthName } from '../lib/i18n'
 
 interface PayrollVar {
   gross_salary: number
@@ -23,7 +24,7 @@ interface Props {
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null
   return (
-    <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-lg text-xs">
+    <div className="bg-white border border-slate-200 rounded-md p-3 shadow-lg text-xs">
       <p className="font-semibold text-slate-700 mb-2">{label}</p>
       {payload.map((p: any) => (
         <p key={p.name} style={{ color: p.color }} className="font-medium">
@@ -48,7 +49,7 @@ export function SalaryHistoryChart({ variables }: Props) {
         const year = v.payroll_periods?.period_year ?? v.period_year ?? 0
         const month = v.payroll_periods?.period_month ?? v.period_month ?? 1
         return {
-          mois: `${MONTH_NAMES[month - 1].slice(0, 3)} ${year}`,
+          mois: `${monthName(month - 1).slice(0, 3)} ${year}`,
           'Brut': v.gross_salary,
           'Net': v.net_payable,
           'IRPP': v.irpp_net || v.its_net || 0,
@@ -57,7 +58,7 @@ export function SalaryHistoryChart({ variables }: Props) {
   }, [variables])
 
   if (data.length === 0) return (
-    <p className="text-sm text-slate-400 italic text-center py-6">Pas encore de données.</p>
+    <p className="text-sm text-slate-400 italic text-center py-6">{t("Pas encore de données.")}</p>
   )
 
   return (

@@ -17,6 +17,20 @@ import ExcelJS from 'exceljs'
 const NEON_AUTH_BASE_URL = process.env.NEON_AUTH_BASE_URL
 const DB_URL = () => process.env.DATABASE_URL || process.env.POSTGRES_PRISMA_URL
 
+// Colonnes d'ancienneté : créées automatiquement au premier enregistrement,
+// pour qu'aucune migration manuelle ne soit nécessaire après le déploiement.
+let seniorityColumnsReady = null
+function ensureSeniorityColumns() {
+  if (!seniorityColumnsReady) {
+    seniorityColumnsReady = (async () => {
+      const db = neon(DB_URL())
+      await db`ALTER TABLE payroll_variables ADD COLUMN IF NOT EXISTS taux_anciennete NUMERIC DEFAULT 0`
+      await db`ALTER TABLE payroll_variables ADD COLUMN IF NOT EXISTS indemnite_anciennete NUMERIC DEFAULT 0`
+    })().catch(err => { seniorityColumnsReady = null; console.warn('[schema] anciennete:', err.message) })
+  }
+  return seniorityColumnsReady
+}
+
 // ─── SESSION HELPER ───────────────────────────────────────────────────────────
 async function getSession(cookieHeader) {
   if (!NEON_AUTH_BASE_URL) throw new Error('NEON_AUTH_BASE_URL non configuré')
@@ -975,10 +989,7 @@ export default async function handler(req, res) {
       const rubriques = []
       if (v.base_salary)         rubriques.push({ label:'Salaire de Base',        base:v.base_salary,        taux_ou_nb:30 })
       if (v.sursalaire)          rubriques.push({ label:'Sursalaire',             base:v.sursalaire,          taux_ou_nb:30 })
-      if (v.hire_date) {
-        const ann = Math.floor((Date.now()-new Date(v.hire_date))/(1000*60*60*24*365))
-        if (ann >= 2) rubriques.push({ label:'Ancienneté', base:Math.round(((v.base_salary||0)+(v.sursalaire||0))*ann*0.02), taux_ou_nb:30 })
-      }
+      if (v.indemnite_anciennete) rubriques.push({ label:'Ancienneté', base:v.indemnite_anciennete, taux_ou_nb:30 })
       if (v.indemnite_fonction)      rubriques.push({ label:'Indemnité de fonction',     base:v.indemnite_fonction,      taux_ou_nb:30 })
       if (v.indemnite_logement)      rubriques.push({ label:'Indemnité de logement',     base:v.indemnite_logement,      taux_ou_nb:30 })
       if (v.indemnite_transport)     rubriques.push({ label:'Indemnité de Transport',    base:v.indemnite_transport,     taux_ou_nb:30 })
@@ -1403,6 +1414,7 @@ export default async function handler(req, res) {
         const r=await sql(q,p); return res.status(200).json(r.rows)
       }
       if (method === 'POST' || method === 'PUT') {
+        await ensureSeniorityColumns()
         const b=req.body
         const ex=await sql('SELECT id FROM payroll_variables WHERE period_id=$1 AND employee_id=$2',[b.period_id,b.employee_id])
         let r

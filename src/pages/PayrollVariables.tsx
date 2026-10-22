@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { payrollApi, employeesApi } from '../lib/api'
 import { useAuth } from '../context/AuthContext'
-import { calculatePayroll, formatXOF, MONTH_NAMES, PayrollInput, PayrollResult } from '../lib/payroll'
+import { calculatePayroll, calcSeniorityAllowance, suggestSeniorityRate, formatXOF, PayrollResult } from '../lib/payroll'
 import { ArrowLeft, Calculator, FileText, Save, Lock, Loader2, Search, Info, Download } from 'lucide-react'
+import { t, monthName } from '../lib/i18n'
 
 interface Employee { id: string; first_name: string; last_name: string; matricule: string|null; position: string|null; category: string|null; marital_status: string; children_count: number; client_id: string; email: string|null; phone: string|null; social_security_number: string|null; hire_date: string|null; client_name?: string }
 
-const EMPTY_VARS = { base_salary: 0, overtime_premium: 0, function_allowance: 0, communication_allowance: 0, housing_premium: 0, meal_premium: 0, transport_allowance: 0, salary_advance: 0, loan_payment: 0, flat_deduction: 0, indemnite_grossesse: 0 }
+const EMPTY_VARS = { base_salary: 0, taux_anciennete: 0, overtime_premium: 0, function_allowance: 0, communication_allowance: 0, housing_premium: 0, meal_premium: 0, transport_allowance: 0, salary_advance: 0, loan_payment: 0, flat_deduction: 0, indemnite_grossesse: 0 }
 
 export default function PayrollVariables() {
   const { periodId } = useParams<{ periodId: string }>()
@@ -43,40 +44,41 @@ export default function PayrollVariables() {
     } catch {} finally { setLoading(false) }
   }
 
+  const formFromRow = (row: any) => ({
+    base_salary:             Number(row.base_salary)            || 0,
+    taux_anciennete:         Number(row.taux_anciennete)        || 0,
+    overtime_premium:        Number(row.sursalaire)             || 0,
+    function_allowance:      Number(row.indemnite_fonction)     || 0,
+    communication_allowance: Number(row.indemnite_communication)|| 0,
+    housing_premium:         Number(row.indemnite_logement)     || 0,
+    meal_premium:            Number(row.indemnite_repas)        || 0,
+    transport_allowance:     Number(row.indemnite_transport)    || 0,
+    salary_advance:          Number(row.avance_salaire)         || 0,
+    loan_payment:            Number(row.remboursement_pret)     || 0,
+    flat_deduction:          Number(row.deduction_forfaitaire)  || 0,
+    indemnite_grossesse:     Number(row.indemnite_grossesse)    || 0,
+  })
+
+  const seniorityOf = (f: typeof EMPTY_VARS) => calcSeniorityAllowance(f.base_salary, f.overtime_premium, f.taux_anciennete)
+
+  const buildInput = (f: typeof EMPTY_VARS, emp: Employee) => ({
+    ...f,
+    seniority_allowance: seniorityOf(f),
+    marital_status: emp.marital_status,
+    children_count: emp.children_count,
+  })
+
   const selectEmployee = (emp: Employee) => {
     setSelectedEmpId(emp.id)
     const existing = variables.get(emp.id)
     if (existing) {
-      setForm({
-        base_salary:             existing.base_salary            || 0,
-        overtime_premium:        existing.sursalaire             || 0,
-        function_allowance:      existing.indemnite_fonction     || 0,
-        communication_allowance: existing.indemnite_communication|| 0,
-        housing_premium:         existing.indemnite_logement     || 0,
-        meal_premium:            existing.indemnite_repas        || 0,
-        transport_allowance:     existing.indemnite_transport    || 0,
-        salary_advance:          existing.avance_salaire         || 0,
-        loan_payment:            existing.remboursement_pret     || 0,
-        flat_deduction:          existing.deduction_forfaitaire  || 0,
-        indemnite_grossesse:     existing.indemnite_grossesse    || 0,
-      })
-      const mappedForCalc = {
-        base_salary:             existing.base_salary            || 0,
-        overtime_premium:        existing.sursalaire             || 0,
-        function_allowance:      existing.indemnite_fonction     || 0,
-        communication_allowance: existing.indemnite_communication|| 0,
-        housing_premium:         existing.indemnite_logement     || 0,
-        meal_premium:            existing.indemnite_repas        || 0,
-        transport_allowance:     existing.indemnite_transport    || 0,
-        salary_advance:          existing.avance_salaire         || 0,
-        loan_payment:            existing.remboursement_pret     || 0,
-        flat_deduction:          existing.deduction_forfaitaire  || 0,
-        indemnite_grossesse:     existing.indemnite_grossesse    || 0,
-        marital_status:          emp.marital_status,
-        children_count:          emp.children_count,
-      }
-      setResult(calculatePayroll(mappedForCalc))
-    } else { setForm(EMPTY_VARS); setResult(null) }
+      const f = formFromRow(existing)
+      setForm(f)
+      setResult(calculatePayroll(buildInput(f, emp)))
+    } else {
+      setForm({ ...EMPTY_VARS, taux_anciennete: suggestSeniorityRate(emp.hire_date) })
+      setResult(null)
+    }
   }
 
   const handleCalculate = () => {
@@ -84,7 +86,7 @@ export default function PayrollVariables() {
     const emp = employees.find(e => e.id === selectedEmpId)
     if (!emp) return
     setCalculating(true)
-    setResult(calculatePayroll({ ...form, marital_status: emp.marital_status, children_count: emp.children_count }))
+    setResult(calculatePayroll(buildInput(form, emp)))
     setCalculating(false)
   }
 
@@ -100,6 +102,8 @@ export default function PayrollVariables() {
       indemnite_logement: form.housing_premium || 0,
       indemnite_repas: form.meal_premium || 0,
       indemnite_transport: form.transport_allowance || 0,
+      taux_anciennete: form.taux_anciennete || 0,
+      indemnite_anciennete: seniorityOf(form),
       avance_salaire: form.salary_advance || 0,
       remboursement_pret: form.loan_payment || 0,
       deduction_forfaitaire: form.flat_deduction || 0,
@@ -130,7 +134,7 @@ export default function PayrollVariables() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ period_id: periodId, employee_id: selectedEmpId }),
       })
-      if (!res.ok) { const e = await res.json().catch(()=>({error:'Erreur'})); alert(e.error); return }
+      if (!res.ok) { const e = await res.json().catch(()=>({error:t("Erreur")})); alert(e.error); return }
       const blob = await res.blob()
       const emp = employees.find(e => e.id === selectedEmpId)
       const a = document.createElement('a')
@@ -142,7 +146,7 @@ export default function PayrollVariables() {
 
   const handleClosePeriod = async () => {
     if (!periodId || !period) return
-    if (!confirm('Clôturer cette période ?')) return
+    if (!confirm(t("Clôturer cette période ?"))) return
     await payrollApi.updatePeriod(periodId, { status: 'closed', closed_at: new Date().toISOString() })
     fetchData()
   }
@@ -150,19 +154,20 @@ export default function PayrollVariables() {
   const filteredEmployees = employees.filter(e => `${e.first_name} ${e.last_name}`.toLowerCase().includes(search.toLowerCase()))
   const isClosed = period?.status === 'closed'
   const selectedEmp = employees.find(e => e.id === selectedEmpId)
+  const suggestedRate = selectedEmp ? suggestSeniorityRate(selectedEmp.hire_date) : 0
 
   if (loading) return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div></div>
-  if (!period) return <div className="text-center py-12"><p className="text-slate-500">Période introuvable.</p><Link to="/payroll" className="btn-primary mt-4 inline-flex">Retour</Link></div>
+  if (!period) return <div className="text-center py-12"><p className="text-slate-500">{t("Période introuvable.")}</p><Link to="/payroll" className="btn-primary mt-4 inline-flex">{t("Retour")}</Link></div>
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-4">
-          <Link to="/payroll" className="btn-ghost"><ArrowLeft className="w-4 h-4" /> Retour</Link>
-          <div><h1 className="text-2xl font-bold text-slate-900">{MONTH_NAMES[period.period_month-1]} {period.period_year}</h1><p className="text-slate-500">{period.client_name}</p></div>
+          <Link to="/payroll" className="btn-ghost"><ArrowLeft className="w-4 h-4" /> {t("Retour")}</Link>
+          <div><h1 className="text-2xl font-bold text-slate-900">{monthName(period.period_month-1)} {period.period_year}</h1><p className="text-slate-500">{period.client_name}</p></div>
         </div>
         <div className="flex items-center gap-3">
-          {isClosed ? <span className="badge-success">Période clôturée</span> : <button onClick={handleClosePeriod} className="btn-secondary"><Lock className="w-4 h-4" /> Clôturer</button>}
+          {isClosed ? <span className="badge-success">{t("Période clôturée")}</span> : <button onClick={handleClosePeriod} className="btn-secondary"><Lock className="w-4 h-4" /> {t("Clôturer")}</button>}
         </div>
       </div>
 
@@ -170,10 +175,10 @@ export default function PayrollVariables() {
         <div className="lg:col-span-1">
           <div className="card overflow-hidden">
             <div className="p-4 border-b border-slate-200">
-              <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" /><input type="text" value={search} onChange={e => setSearch(e.target.value)} className="input pl-10" placeholder="Rechercher..." /></div>
+              <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" /><input type="text" value={search} onChange={e => setSearch(e.target.value)} className="input pl-10" placeholder={t("Rechercher...")} /></div>
             </div>
             <div className="max-h-[600px] overflow-y-auto">
-              {filteredEmployees.length === 0 ? <p className="text-center text-slate-500 py-8 text-sm">Aucun employé actif.</p>
+              {filteredEmployees.length === 0 ? <p className="text-center text-slate-500 py-8 text-sm">{t("Aucun employé actif.")}</p>
                 : filteredEmployees.map(emp => {
                   const hasVars = variables.has(emp.id)
                   return (
@@ -181,7 +186,7 @@ export default function PayrollVariables() {
                       className={`w-full flex items-center gap-3 px-4 py-3 text-left border-b border-slate-50 transition-colors disabled:cursor-not-allowed ${selectedEmpId === emp.id ? 'bg-primary-50 border-l-4 border-l-primary-600' : 'hover:bg-slate-50'}`}>
                       <div className="w-9 h-9 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 font-medium text-sm flex-shrink-0">{emp.first_name[0]}{emp.last_name[0]}</div>
                       <div className="flex-1 min-w-0"><p className="text-sm font-medium text-slate-900 truncate">{emp.first_name} {emp.last_name}</p><p className="text-xs text-slate-500 truncate">{emp.position || '—'}</p></div>
-                      {hasVars && <span className="badge-info flex-shrink-0">Calculé</span>}
+                      {hasVars && <span className="badge-info flex-shrink-0">{t("Calculé")}</span>}
                     </button>
                   )
                 })
@@ -192,46 +197,72 @@ export default function PayrollVariables() {
 
         <div className="lg:col-span-2">
           {!selectedEmp ? (
-            <div className="card p-12 text-center"><Calculator className="w-12 h-12 text-slate-300 mx-auto mb-3" /><p className="text-slate-500">Sélectionnez un employé.</p></div>
+            <div className="card p-12 text-center"><Calculator className="w-12 h-12 text-slate-300 mx-auto mb-3" /><p className="text-slate-500">{t("Sélectionnez un employé.")}</p></div>
           ) : (
             <div className="space-y-6">
               <div className="card p-5">
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 font-medium">{selectedEmp.first_name[0]}{selectedEmp.last_name[0]}</div>
                   <div><h3 className="font-semibold text-slate-900">{selectedEmp.first_name} {selectedEmp.last_name}</h3><p className="text-sm text-slate-500">{selectedEmp.position||'—'} · {selectedEmp.category||'—'}</p></div>
-                  <div className="ml-auto text-right text-sm text-slate-500"><p className="capitalize">{selectedEmp.marital_status}</p><p>{selectedEmp.children_count} enfant(s)</p></div>
+                  <div className="ml-auto text-right text-sm text-slate-500"><p className="capitalize">{selectedEmp.marital_status}</p><p>{selectedEmp.children_count} {t("enfant(s)")}</p></div>
                 </div>
               </div>
 
               <div className="card p-6">
-                <h3 className="font-semibold text-slate-900 mb-4">Variables de paie</h3>
+                <h3 className="font-semibold text-slate-900 mb-4">{t("Variables de paie")}</h3>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                   {[
-                    { key: 'base_salary', label: 'Salaire de base' }, { key: 'overtime_premium', label: 'Sursalaire' },
-                    { key: 'function_allowance', label: 'Ind. de fonction' },
+                    { key: 'base_salary', label: t("Salaire de base") }, { key: 'overtime_premium', label: 'Sursalaire' },
+                    { key: 'function_allowance', label: t("Ind. de fonction") },
                     { key: 'communication_allowance', label: 'Ind. communication' }, { key: 'housing_premium', label: 'Prime logement' },
                     { key: 'meal_premium', label: 'Prime repas' }, { key: 'transport_allowance', label: 'Ind. transport' },
-                    { key: 'flat_deduction', label: 'Déduction forfaitaire' }, { key: 'salary_advance', label: 'Avance salaire' },
-                    { key: 'loan_payment', label: 'Remb. prêt' },
+                    { key: 'flat_deduction', label: t("Déduction forfaitaire") }, { key: 'salary_advance', label: 'Avance salaire' },
+                    { key: 'loan_payment', label: t("Remb. prêt") },
                     { key: 'indemnite_grossesse', label: 'Ind. enceinte' },
                   ].map(({ key, label }) => (
                     <div key={key}>
                       <label className="label">{label}</label>
-                      <input type="number" min="0" disabled={isClosed} value={(form as any)[key] === 0 ? '' : (form as any)[key]} placeholder="0"
+                      <input type="number" min="0" disabled={isClosed} value={(form as any)[key] === 0 ? '' : (form as any)[key]} placeholder={t("0")}
                         onChange={e => setForm({...form, [key]: e.target.value === '' ? 0 : Number(e.target.value)})}
                         onFocus={e => e.target.select()} className="input" />
                     </div>
                   ))}
                 </div>
+                <div className="mt-6 pt-5 border-t border-slate-200">
+                  <h4 className="text-sm font-semibold text-slate-900 mb-3">{t("Indemnité ancienneté")}</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
+                    <div>
+                      <label className="label">{t("Taux ancienneté (%)")}</label>
+                      <input type="number" min="0" max="100" step="0.5" disabled={isClosed} value={form.taux_anciennete === 0 ? '' : form.taux_anciennete} placeholder="0"
+                        onChange={e => setForm({ ...form, taux_anciennete: e.target.value === '' ? 0 : Number(e.target.value) })}
+                        onFocus={e => e.target.select()} className="input" />
+                    </div>
+                    <div>
+                      <label className="label">{t("Indemnité ancienneté")}</label>
+                      <div className="input bg-slate-50 tabular-nums text-slate-700">{formatXOF(seniorityOf(form))}</div>
+                    </div>
+                    <div>
+                      <button type="button" disabled={isClosed || suggestedRate === 0 || suggestedRate === form.taux_anciennete}
+                        onClick={() => setForm({ ...form, taux_anciennete: suggestedRate })} className="btn-secondary w-full">
+                        {t("Appliquer le taux suggéré")}
+                      </button>
+                    </div>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-2">
+                    {t("Calculée sur le salaire de base et le sursalaire.")}{' '}
+                    {selectedEmp.hire_date ? `${t("Taux suggéré d'après la date d'embauche :")} ${suggestedRate} %` : t("Aucune date d'embauche renseignée.")}
+                  </p>
+                </div>
+
                 <div className="flex gap-3 mt-6">
                   <button onClick={handleCalculate} disabled={isClosed||calculating} className="btn-primary">
-                    {calculating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Calculator className="w-4 h-4" />} Calculer
+                    {calculating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Calculator className="w-4 h-4" />} {t("Calculer")}
                   </button>
                   <button onClick={handleSave} disabled={isClosed||saving} className="btn-secondary">
-                    {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Enregistrer
+                    {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} {t("Enregistrer")}
                   </button>
-                  <button onClick={handleDownloadXlsx} disabled={isClosed||saving} className="btn-ghost text-green-600 hover:bg-green-50">
-                    {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />} Bulletin xlsx
+                  <button onClick={handleDownloadXlsx} disabled={isClosed||saving} className="btn-ghost text-emerald-600 hover:bg-emerald-50">
+                    {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />} {t("Bulletin xlsx")}
                   </button>
                 </div>
               </div>
@@ -239,28 +270,29 @@ export default function PayrollVariables() {
               {result && (
                 <div className="card p-6 page-enter">
                   <div className="flex items-center gap-2 mb-4">
-                    <h3 className="font-semibold text-slate-900">Résultats du calcul</h3>
-                    <span className="text-xs text-slate-400 flex items-center gap-1"><Info className="w-3 h-3" /> CGI OTR 2025</span>
+                    <h3 className="font-semibold text-slate-900">{t("Résultats du calcul")}</h3>
+                    <span className="text-xs text-slate-400 flex items-center gap-1"><Info className="w-3 h-3" /> {t("CGI OTR 2025")}</span>
                   </div>
                   <div className="space-y-1">
-                    <ResultRow label="Salaire brut" value={result.gross_salary} />
-                    {result.indemnite_grossesse > 0 && <ResultRow label="  dont ind. enceinte (exo.)" value={result.indemnite_grossesse} muted />}
-                    <ResultRow label="CNSS salarié (4%)" value={-result.cnss_employee} negative />
-                    <ResultRow label="AMU salarié (5%)" value={-result.amu_employee} negative />
-                    <ResultRow label="Abattement 28%" value={-result.abattement_28} negative muted />
-                    <ResultRow label="Charges famille" value={-result.charges_famille} negative muted />
-                    <ResultRow label="Revenu imposable" value={result.taxable_income_monthly} muted />
-                    <ResultRow label="IRPP mensuel" value={-result.irpp_net} negative />
-                    {form.salary_advance > 0 && <ResultRow label="Avance sur salaire" value={-form.salary_advance} negative />}
-                    {form.loan_payment > 0 && <ResultRow label="Remboursement prêt" value={-form.loan_payment} negative />}
-                    <div className="border-t border-slate-200 pt-2 mt-2"><ResultRow label="NET À PAYER" value={result.net_payable} bold /></div>
+                    <ResultRow label={t("Salaire brut")} value={result.gross_salary} />
+                    {result.seniority_allowance > 0 && <ResultRow label={t("dont ind. ancienneté")} value={result.seniority_allowance} muted />}
+                    {result.indemnite_grossesse > 0 && <ResultRow label={t("dont ind. enceinte (exo.)")} value={result.indemnite_grossesse} muted />}
+                    <ResultRow label={t("CNSS salarié (4%)")} value={-result.cnss_employee} negative />
+                    <ResultRow label={t("AMU salarié (5%)")} value={-result.amu_employee} negative />
+                    <ResultRow label={t("Abattement 28%")} value={-result.abattement_28} negative muted />
+                    <ResultRow label={t("Charges famille")} value={-result.charges_famille} negative muted />
+                    <ResultRow label={t("Revenu imposable")} value={result.taxable_income_monthly} muted />
+                    <ResultRow label={t("IRPP mensuel")} value={-result.irpp_net} negative />
+                    {form.salary_advance > 0 && <ResultRow label={t("Avance sur salaire")} value={-form.salary_advance} negative />}
+                    {form.loan_payment > 0 && <ResultRow label={t("Remboursement prêt")} value={-form.loan_payment} negative />}
+                    <div className="border-t border-slate-200 pt-2 mt-2"><ResultRow label={t("NET À PAYER")} value={result.net_payable} bold /></div>
                   </div>
                   <div className="mt-4 pt-4 border-t border-slate-100">
-                    <p className="text-xs font-semibold text-slate-500 uppercase mb-2">Charges patronales</p>
+                    <p className="text-xs font-semibold text-slate-500 uppercase mb-2">{t("Charges patronales")}</p>
                     <div className="space-y-1">
-                      <ResultRow label="CNSS employeur (17,5%)" value={result.cnss_employer} muted />
-                      <ResultRow label="AMU employeur (5%)" value={result.amu_employer} muted />
-                      <ResultRow label="Total charges patronales" value={result.employer_total} bold />
+                      <ResultRow label={t("CNSS employeur (17,5%)")} value={result.cnss_employer} muted />
+                      <ResultRow label={t("AMU employeur (5%)")} value={result.amu_employer} muted />
+                      <ResultRow label={t("Total charges patronales")} value={result.employer_total} bold />
                     </div>
                   </div>
                 </div>

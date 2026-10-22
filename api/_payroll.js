@@ -38,17 +38,15 @@ export function calcIrppMensuel(brut, persCharge = 0) {
   return Math.round(calcIrppAnnuel(imposable) / 12)
 }
 
-export function calcAnciete(hireDate, baseSalary, sursalaire) {
-  if (!hireDate) return 0
-  const mois = Math.floor((Date.now() - new Date(hireDate)) / (1000 * 60 * 60 * 24 * 30))
-  const ann = Math.floor(mois / 12)
-  if (ann < 2) return 0
-  return Math.round((baseSalary + sursalaire) * ann * 0.02)
+// Indemnité d'ancienneté = (salaire de base + sursalaire) × taux (%)
+export function calcAnciennete(baseSalary, sursalaire, tauxPct) {
+  return Math.round(((baseSalary || 0) + (sursalaire || 0)) * ((tauxPct || 0) / 100))
 }
 
 export function calcBrut(vars) {
   return (vars.base_salary || 0)
     + (vars.sursalaire || 0)
+    + (vars.indemnite_anciennete || 0)
     + (vars.indemnite_fonction || 0)
     + (vars.indemnite_communication || 0)
     + (vars.indemnite_logement || 0)

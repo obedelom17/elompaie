@@ -88,6 +88,8 @@ CREATE TABLE IF NOT EXISTS payroll_variables (
   indemnite_logement NUMERIC DEFAULT 0,
   indemnite_repas NUMERIC DEFAULT 0,
   indemnite_transport NUMERIC DEFAULT 0,
+  taux_anciennete NUMERIC DEFAULT 0,
+  indemnite_anciennete NUMERIC DEFAULT 0,
   avance_salaire NUMERIC DEFAULT 0,
   remboursement_pret NUMERIC DEFAULT 0,
   deduction_forfaitaire NUMERIC DEFAULT 0,

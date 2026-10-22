@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { MessageCircle, X, Send, Bot, User, Loader2, Minimize2, Maximize2, Trash2, Wrench } from 'lucide-react'
 import { calculatePayroll, formatXOF } from '../lib/payroll'
+import { t, getLang } from '../lib/i18n'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -140,7 +141,7 @@ async function executeTool(name: string, args: Record<string, any>): Promise<str
         const params = new URLSearchParams()
         if (args.client_nom) params.set('search', args.client_nom)
         const res = await fetch(`/api/employees${params.toString() ? '?' + params : ''}`, { credentials: 'include' })
-        if (!res.ok) return JSON.stringify({ error: 'Accès refusé ou erreur serveur' })
+        if (!res.ok) return JSON.stringify({ error: t("Accès refusé ou erreur serveur") })
         const all: any[] = await res.json()
         const q = (args.nom || args.matricule || '').toLowerCase()
         const filtered = q
@@ -158,13 +159,13 @@ async function executeTool(name: string, args: Record<string, any>): Promise<str
           statut: e.status,
           embauche: e.hire_date,
         })))
-      } catch { return JSON.stringify({ error: 'Impossible de récupérer les employés' }) }
+      } catch { return JSON.stringify({ error: t("Impossible de récupérer les employés") }) }
     }
 
     case 'lister_periodes': {
       try {
         const res = await fetch('/api/payroll', { credentials: 'include' })
-        if (!res.ok) return JSON.stringify({ error: 'Erreur serveur' })
+        if (!res.ok) return JSON.stringify({ error: t("Erreur serveur") })
         let periods: any[] = await res.json()
         const statut = args.statut || 'all'
         if (statut !== 'all') periods = periods.filter(p => p.status === statut)
@@ -172,11 +173,11 @@ async function executeTool(name: string, args: Record<string, any>): Promise<str
         return JSON.stringify(periods.slice(0, limite).map(p => ({
           mois: p.period_month,
           annee: p.period_year,
-          statut: p.status === 'open' ? 'Ouverte' : 'Clôturée',
+          statut: p.status === 'open' ? 'Ouverte' : t("Clôturée"),
           client: p.client_name,
           id: p.id,
         })))
-      } catch { return JSON.stringify({ error: 'Impossible de récupérer les périodes' }) }
+      } catch { return JSON.stringify({ error: t("Impossible de récupérer les périodes") }) }
     }
 
     case 'obtenir_stats': {
@@ -202,7 +203,7 @@ async function executeTool(name: string, args: Record<string, any>): Promise<str
           periodes_cloturees: cloturees,
           periodes_total: periods.length,
         })
-      } catch { return JSON.stringify({ error: 'Impossible de récupérer les statistiques' }) }
+      } catch { return JSON.stringify({ error: t("Impossible de récupérer les statistiques") }) }
     }
 
     default:
@@ -237,9 +238,9 @@ Instructions :
 // ─── Rendu du message tool call ───────────────────────────────────────────────
 function ToolCallBadge({ call }: { call: ToolCall }) {
   const labels: Record<string, string> = {
-    calculer_paie: 'Calcul de paie',
-    chercher_employe: 'Recherche employé',
-    lister_periodes: 'Périodes de paie',
+    calculer_paie: t("Calcul de paie"),
+    chercher_employe: t("Recherche employé"),
+    lister_periodes: t("Périodes de paie"),
     obtenir_stats: 'Statistiques',
   }
   return (
@@ -258,7 +259,7 @@ export function AIChatbot() {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
-      content: 'Bonjour ! Je suis PaieBot, votre assistant paie Togo.\n\nJe peux vous aider avec :\n- Calculs de paie (IRPP, CNSS, AMU)\n- Questions CGI OTR 2025\n- Code du Travail 2021\n- Indemnités et primes\n- Consultation de vos données (employés, périodes)\n\nQue puis-je faire pour vous ?',
+      content: t("Bonjour ! Je suis PaieBot, votre assistant paie Togo.\n\nJe peux vous aider avec :\n- Calculs de paie (IRPP, CNSS, AMU)\n- Questions CGI OTR 2025\n- Code du Travail 2021\n- Indemnités et primes\n- Consultation de vos données (employés, périodes)\n\nQue puis-je faire pour vous ?"),
       ts: Date.now(),
     }
   ])
@@ -306,7 +307,7 @@ export function AIChatbot() {
     try {
       // Construire le contexte pour Groq
       const groqMessages = [
-        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'system', content: SYSTEM_PROMPT + (getLang() === 'en' ? '\n\nIMPORTANT: the user interface is in English. Reply in English.' : '') },
         ...history.map(m => ({ role: m.role, content: m.content })),
       ]
 
@@ -361,7 +362,7 @@ export function AIChatbot() {
       }
 
       // Réponse finale
-      const reply = choice?.message?.content || 'Désolé, je ne peux pas répondre.'
+      const reply = choice?.message?.content || t("Désolé, je ne peux pas répondre.")
       setMessages(prev => [...prev, { role: 'assistant', content: reply, ts: Date.now() }])
 
     } catch (e: any) {
@@ -418,11 +419,11 @@ export function AIChatbot() {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-2xl bg-gradient-to-br from-primary-500 to-accent-600 text-white shadow-modal hover:scale-110 active:scale-95 transition-all duration-300 flex items-center justify-center animate-glow"
+        className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-lg bg-primary-600 text-white shadow-modal transition-all duration-300 flex items-center justify-center"
       >
         <MessageCircle className="w-6 h-6" />
         {unread > 0 && (
-          <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-xs flex items-center justify-center font-bold animate-bounce-soft">
+          <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-xs flex items-center justify-center font-bold">
             {unread}
           </span>
         )}
@@ -432,21 +433,21 @@ export function AIChatbot() {
 
   // ─── Fenêtre chat ─────────────────────────────────────────────────────────
   return (
-    <div className={`fixed bottom-6 right-6 z-50 flex flex-col bg-white rounded-3xl shadow-modal border border-slate-100 transition-all duration-300 ${minimized ? 'h-16 w-72' : 'h-[620px] w-[390px]'}`}>
+    <div className={`fixed bottom-6 right-6 z-50 flex flex-col bg-white rounded-xl shadow-modal border border-slate-100 transition-all duration-300 ${minimized ? 'h-16 w-72' : 'h-[620px] w-[390px]'}`}>
       {/* Header */}
-      <div className="flex items-center gap-3 px-5 py-4 bg-gradient-to-r from-primary-600 to-accent-600 rounded-t-3xl flex-shrink-0">
-        <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center">
+      <div className="flex items-center gap-3 px-5 py-4 bg-primary-600 rounded-t-3xl flex-shrink-0">
+        <div className="w-9 h-9 rounded-md bg-white/20 flex items-center justify-center">
           <Bot className="w-5 h-5 text-white" />
         </div>
         <div className="flex-1">
-          <p className="text-white font-bold text-sm">PaieBot IA</p>
+          <p className="text-white font-bold text-sm">{t("PaieBot IA")}</p>
           <div className="flex items-center gap-1.5">
-            <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse-soft" />
-            <p className="text-white/70 text-xs">Groq · Llama 3.3 70B + Outils</p>
+            <span className="w-2 h-2 bg-emerald-400 rounded-full" />
+            <p className="text-white/70 text-xs">{t("Groq · Llama 3.3 70B + Outils")}</p>
           </div>
         </div>
         <div className="flex items-center gap-1">
-          <button onClick={clear} className="p-1.5 rounded-lg hover:bg-white/20 text-white/70 hover:text-white transition-colors" title="Effacer">
+          <button onClick={clear} className="p-1.5 rounded-lg hover:bg-white/20 text-white/70 hover:text-white transition-colors" title={t("Effacer")}>
             <Trash2 className="w-4 h-4" />
           </button>
           <button onClick={() => setMinimized(!minimized)} className="p-1.5 rounded-lg hover:bg-white/20 text-white/70 hover:text-white transition-colors">
@@ -464,10 +465,10 @@ export function AIChatbot() {
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
             {messages.map((msg, i) => (
               <div key={i} className={`flex gap-2.5 ${msg.role === 'user' ? 'flex-row-reverse' : ''} animate-fade-in`}>
-                <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                <div className={`w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0 ${
                   msg.role === 'user'
                     ? 'bg-primary-100'
-                    : 'bg-gradient-to-br from-primary-500 to-accent-600'
+                    : 'bg-primary-600'
                 }`}>
                   {msg.role === 'user'
                     ? <User className="w-4 h-4 text-primary-600" />
@@ -480,7 +481,7 @@ export function AIChatbot() {
                   {/* Contenu texte */}
                   {msg.content && (
                     <div
-                      className={`px-4 py-3 rounded-2xl text-sm leading-relaxed ${
+                      className={`px-4 py-3 rounded-lg text-sm leading-relaxed ${
                         msg.role === 'user'
                           ? 'bg-primary-600 text-white rounded-tr-sm'
                           : 'bg-slate-50 text-slate-800 rounded-tl-sm border border-slate-100'
@@ -493,12 +494,12 @@ export function AIChatbot() {
             ))}
             {loading && (
               <div className="flex gap-2.5 animate-fade-in">
-                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-primary-500 to-accent-600 flex items-center justify-center flex-shrink-0">
+                <div className="w-8 h-8 rounded-md bg-primary-600 flex items-center justify-center flex-shrink-0">
                   <Bot className="w-4 h-4 text-white" />
                 </div>
-                <div className="bg-slate-50 border border-slate-100 px-4 py-3 rounded-2xl rounded-tl-sm flex items-center gap-2">
+                <div className="bg-slate-50 border border-slate-100 px-4 py-3 rounded-lg rounded-tl-sm flex items-center gap-2">
                   <Loader2 className="w-4 h-4 animate-spin text-primary-500" />
-                  <span className="text-sm text-slate-400">Réflexion...</span>
+                  <span className="text-sm text-slate-400">{t("Réflexion...")}</span>
                 </div>
               </div>
             )}
@@ -508,10 +509,10 @@ export function AIChatbot() {
           {/* Suggestions */}
           <div className="px-4 pb-2 flex gap-2 overflow-x-auto">
             {[
-              'Calcul paie 500 000F marié 2 enfants',
-              'Stats du cabinet',
+              t("Calcul paie 500 000F marié 2 enfants"),
+              t("Stats du cabinet"),
               'SMIG Togo 2025',
-              'Périodes ouvertes',
+              t("Périodes ouvertes"),
             ].map(s => (
               <button
                 key={s}
@@ -530,7 +531,7 @@ export function AIChatbot() {
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={handleKey}
-              placeholder="Posez votre question sur la paie..."
+              placeholder={t("Posez votre question sur la paie...")}
               rows={1}
               className="flex-1 resize-none input py-2.5 text-sm max-h-32"
               style={{ minHeight: '40px' }}
@@ -538,7 +539,7 @@ export function AIChatbot() {
             <button
               onClick={send}
               disabled={loading || !input.trim()}
-              className="btn-primary p-2.5 rounded-xl disabled:opacity-40 flex-shrink-0"
+              className="btn-primary p-2.5 rounded-md disabled:opacity-40 flex-shrink-0"
             >
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
             </button>

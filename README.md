@@ -45,17 +45,11 @@ Application en ligne : https://elompaie.vercel.app
 
 ### Indemnité d'ancienneté
 
-Dans l'écran de saisie des variables d'une période, le champ « Taux ancienneté (%) » détermine l'indemnité :
+Dans l'écran de saisie des variables d'une période, l'indemnité d'ancienneté se saisit directement en montant, dans la section « Rémunération », comme les autres éléments de salaire.
 
-```
-indemnité d'ancienneté = (salaire de base + sursalaire) x taux / 100
-```
-
-- Le montant est recalculé à chaque modification du salaire ou du taux.
-- Un taux est proposé à partir de la date d'embauche : 2 % par année complète, à partir de 2 ans d'ancienneté. Le bouton « Appliquer le taux suggéré » le reprend. Le taux reste modifiable, car il dépend de la convention collective applicable.
-- L'indemnité est incluse dans le salaire brut cotisable : elle entre dans la base de la CNSS, de l'AMU et de l'impôt.
+- Elle est incluse dans le salaire brut cotisable : elle entre dans la base de la CNSS, de l'AMU et de l'impôt.
 - Elle apparaît sur le bulletin sous la rubrique « Ancienneté ».
-- Les colonnes `taux_anciennete` et `indemnite_anciennete` sont créées automatiquement par l'API au premier enregistrement. Le script `migrations/001_anciennete.sql` permet de les créer à la main si besoin.
+- La colonne `indemnite_anciennete` est créée automatiquement par l'API au premier enregistrement. Le script `migrations/001_anciennete.sql` permet de la créer à la main si besoin.
 
 ### Langues
 
@@ -157,17 +151,11 @@ Live application: https://elompaie.vercel.app
 
 ### Seniority allowance
 
-On the payroll variables screen of a period, the "Seniority rate (%)" field determines the allowance:
+On the payroll variables screen of a period, the seniority allowance is entered directly as an amount, in the "Pay" section, like the other salary components.
 
-```
-seniority allowance = (base salary + over-salary) x rate / 100
-```
-
-- The amount is recalculated whenever the salary or the rate changes.
-- A rate is suggested from the hire date: 2% per completed year, starting at 2 years of service. The "Apply suggested rate" button copies it into the field. The rate stays editable, because it depends on the applicable collective agreement.
-- The allowance is part of the contributory gross salary: it is included in the CNSS, AMU and income tax base.
+- It is part of the contributory gross salary: it is included in the CNSS, AMU and income tax base.
 - It appears on the payslip under the "Ancienneté" line.
-- The `taux_anciennete` and `indemnite_anciennete` columns are created automatically by the API on first save. The `migrations/001_anciennete.sql` script creates them by hand if needed.
+- The `indemnite_anciennete` column is created automatically by the API on first save. The `migrations/001_anciennete.sql` script creates it by hand if needed.
 
 ### Languages
 

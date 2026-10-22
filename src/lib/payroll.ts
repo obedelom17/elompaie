@@ -110,19 +110,6 @@ export function calcAnciennete(hireDateStr: string | null): { years: number; mon
   }
 }
 
-// Indemnité d'ancienneté = (salaire de base + sursalaire) × taux (%)
-export function calcSeniorityAllowance(baseSalary: number, overSalary: number, ratePct: number): number {
-  return Math.round(((baseSalary || 0) + (overSalary || 0)) * ((ratePct || 0) / 100))
-}
-
-// Taux suggéré à partir de la date d'embauche : 2 % par année complète, à partir de 2 ans.
-// Il s'agit d'une proposition modifiable : le taux réel dépend de la convention collective applicable.
-export function suggestSeniorityRate(hireDateStr: string | null | undefined): number {
-  if (!hireDateStr) return 0
-  const { years } = calcAnciennete(hireDateStr)
-  return years >= 2 ? years * 2 : 0
-}
-
 export function calculatePayroll(input: PayrollInput): PayrollResult {
   const overtime_amount = input.overtime_hours && input.base_salary
     ? calcOvertimePay(input.base_salary, input.overtime_hours, input.overtime_rate || 'h1')

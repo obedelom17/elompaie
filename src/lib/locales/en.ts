@@ -469,6 +469,10 @@ const en: Record<string, string> = {
   'Manœuvre': 'Labourer',
   'Cadre': 'Manager',
 
+  'Rémunération': 'Pay',
+  'Indemnités et primes': 'Allowances and bonuses',
+  'Retenues': 'Deductions',
+
   // Langue
   'Langue': 'Language',
   'Passer en anglais': 'Switch to English',

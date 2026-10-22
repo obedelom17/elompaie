@@ -24,7 +24,6 @@ function ensureSeniorityColumns() {
   if (!seniorityColumnsReady) {
     seniorityColumnsReady = (async () => {
       const db = neon(DB_URL())
-      await db`ALTER TABLE payroll_variables ADD COLUMN IF NOT EXISTS taux_anciennete NUMERIC DEFAULT 0`
       await db`ALTER TABLE payroll_variables ADD COLUMN IF NOT EXISTS indemnite_anciennete NUMERIC DEFAULT 0`
     })().catch(err => { seniorityColumnsReady = null; console.warn('[schema] anciennete:', err.message) })
   }

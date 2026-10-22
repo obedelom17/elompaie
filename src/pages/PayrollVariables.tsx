@@ -2,13 +2,13 @@ import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { payrollApi, employeesApi } from '../lib/api'
 import { useAuth } from '../context/AuthContext'
-import { calculatePayroll, calcSeniorityAllowance, suggestSeniorityRate, formatXOF, PayrollResult } from '../lib/payroll'
+import { calculatePayroll, formatXOF, PayrollResult } from '../lib/payroll'
 import { ArrowLeft, Calculator, FileText, Save, Lock, Loader2, Search, Info, Download } from 'lucide-react'
 import { t, monthName } from '../lib/i18n'
 
 interface Employee { id: string; first_name: string; last_name: string; matricule: string|null; position: string|null; category: string|null; marital_status: string; children_count: number; client_id: string; email: string|null; phone: string|null; social_security_number: string|null; hire_date: string|null; client_name?: string }
 
-const EMPTY_VARS = { base_salary: 0, taux_anciennete: 0, overtime_premium: 0, function_allowance: 0, communication_allowance: 0, housing_premium: 0, meal_premium: 0, transport_allowance: 0, salary_advance: 0, loan_payment: 0, flat_deduction: 0, indemnite_grossesse: 0 }
+const EMPTY_VARS = { base_salary: 0, seniority_allowance: 0, overtime_premium: 0, function_allowance: 0, communication_allowance: 0, housing_premium: 0, meal_premium: 0, transport_allowance: 0, salary_advance: 0, loan_payment: 0, flat_deduction: 0, indemnite_grossesse: 0 }
 
 export default function PayrollVariables() {
   const { periodId } = useParams<{ periodId: string }>()
@@ -46,7 +46,7 @@ export default function PayrollVariables() {
 
   const formFromRow = (row: any) => ({
     base_salary:             Number(row.base_salary)            || 0,
-    taux_anciennete:         Number(row.taux_anciennete)        || 0,
+    seniority_allowance:     Number(row.indemnite_anciennete)   || 0,
     overtime_premium:        Number(row.sursalaire)             || 0,
     function_allowance:      Number(row.indemnite_fonction)     || 0,
     communication_allowance: Number(row.indemnite_communication)|| 0,
@@ -59,11 +59,8 @@ export default function PayrollVariables() {
     indemnite_grossesse:     Number(row.indemnite_grossesse)    || 0,
   })
 
-  const seniorityOf = (f: typeof EMPTY_VARS) => calcSeniorityAllowance(f.base_salary, f.overtime_premium, f.taux_anciennete)
-
   const buildInput = (f: typeof EMPTY_VARS, emp: Employee) => ({
     ...f,
-    seniority_allowance: seniorityOf(f),
     marital_status: emp.marital_status,
     children_count: emp.children_count,
   })
@@ -76,7 +73,7 @@ export default function PayrollVariables() {
       setForm(f)
       setResult(calculatePayroll(buildInput(f, emp)))
     } else {
-      setForm({ ...EMPTY_VARS, taux_anciennete: suggestSeniorityRate(emp.hire_date) })
+      setForm({ ...EMPTY_VARS })
       setResult(null)
     }
   }
@@ -102,8 +99,7 @@ export default function PayrollVariables() {
       indemnite_logement: form.housing_premium || 0,
       indemnite_repas: form.meal_premium || 0,
       indemnite_transport: form.transport_allowance || 0,
-      taux_anciennete: form.taux_anciennete || 0,
-      indemnite_anciennete: seniorityOf(form),
+      indemnite_anciennete: form.seniority_allowance || 0,
       avance_salaire: form.salary_advance || 0,
       remboursement_pret: form.loan_payment || 0,
       deduction_forfaitaire: form.flat_deduction || 0,
@@ -154,7 +150,6 @@ export default function PayrollVariables() {
   const filteredEmployees = employees.filter(e => `${e.first_name} ${e.last_name}`.toLowerCase().includes(search.toLowerCase()))
   const isClosed = period?.status === 'closed'
   const selectedEmp = employees.find(e => e.id === selectedEmpId)
-  const suggestedRate = selectedEmp ? suggestSeniorityRate(selectedEmp.hire_date) : 0
 
   if (loading) return <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div></div>
   if (!period) return <div className="text-center py-12"><p className="text-slate-500">{t("Période introuvable.")}</p><Link to="/payroll" className="btn-primary mt-4 inline-flex">{t("Retour")}</Link></div>
@@ -209,48 +204,44 @@ export default function PayrollVariables() {
               </div>
 
               <div className="card p-6">
-                <h3 className="font-semibold text-slate-900 mb-4">{t("Variables de paie")}</h3>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <h3 className="font-semibold text-slate-900 mb-5">{t("Variables de paie")}</h3>
+                <div className="space-y-7">
                   {[
-                    { key: 'base_salary', label: t("Salaire de base") }, { key: 'overtime_premium', label: 'Sursalaire' },
-                    { key: 'function_allowance', label: t("Ind. de fonction") },
-                    { key: 'communication_allowance', label: 'Ind. communication' }, { key: 'housing_premium', label: 'Prime logement' },
-                    { key: 'meal_premium', label: 'Prime repas' }, { key: 'transport_allowance', label: 'Ind. transport' },
-                    { key: 'flat_deduction', label: t("Déduction forfaitaire") }, { key: 'salary_advance', label: 'Avance salaire' },
-                    { key: 'loan_payment', label: t("Remb. prêt") },
-                  ].map(({ key, label }) => (
-                    <div key={key}>
-                      <label className="label">{label}</label>
-                      <input type="number" min="0" disabled={isClosed} value={(form as any)[key] === 0 ? '' : (form as any)[key]} placeholder={t("0")}
-                        onChange={e => setForm({...form, [key]: e.target.value === '' ? 0 : Number(e.target.value)})}
-                        onFocus={e => e.target.select()} className="input" />
-                    </div>
+                    { title: t("Rémunération"), fields: [
+                      { key: 'base_salary', label: t("Salaire de base") }, { key: 'overtime_premium', label: t("Sursalaire") },
+                      { key: 'seniority_allowance', label: t("Indemnité d'ancienneté") },
+                    ]},
+                    { title: t("Indemnités et primes"), fields: [
+                      { key: 'function_allowance', label: t("Ind. de fonction") }, { key: 'communication_allowance', label: t("Ind. communication") },
+                      { key: 'housing_premium', label: t("Prime logement") }, { key: 'meal_premium', label: t("Prime repas") },
+                      { key: 'transport_allowance', label: t("Ind. transport") },
+                    ]},
+                    { title: t("Retenues"), fields: [
+                      { key: 'flat_deduction', label: t("Déduction forfaitaire") }, { key: 'salary_advance', label: t("Avance salaire") },
+                      { key: 'loan_payment', label: t("Remb. prêt") },
+                    ]},
+                  ].map((section, idx) => (
+                    <section key={section.title}>
+                      <div className="flex items-center gap-3 mb-3">
+                        <span className="text-xs font-semibold tabular-nums text-accent-600">0{idx + 1}</span>
+                        <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500">{section.title}</h4>
+                        <span className="flex-1 h-px bg-slate-200" />
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {section.fields.map(({ key, label }) => (
+                          <div key={key}>
+                            <label className="label">{label}</label>
+                            <div className="relative">
+                              <input type="number" min="0" disabled={isClosed} value={(form as any)[key] === 0 ? '' : (form as any)[key]} placeholder="0"
+                                onChange={e => setForm({ ...form, [key]: e.target.value === '' ? 0 : Number(e.target.value) })}
+                                onFocus={e => e.target.select()} className="input pr-9 text-right" />
+                              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 pointer-events-none">F</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
                   ))}
-                </div>
-                <div className="mt-6 pt-5 border-t border-slate-200">
-                  <h4 className="text-sm font-semibold text-slate-900 mb-3">{t("Indemnité ancienneté")}</h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
-                    <div>
-                      <label className="label">{t("Taux ancienneté (%)")}</label>
-                      <input type="number" min="0" max="100" step="0.5" disabled={isClosed} value={form.taux_anciennete === 0 ? '' : form.taux_anciennete} placeholder="0"
-                        onChange={e => setForm({ ...form, taux_anciennete: e.target.value === '' ? 0 : Number(e.target.value) })}
-                        onFocus={e => e.target.select()} className="input" />
-                    </div>
-                    <div>
-                      <label className="label">{t("Indemnité ancienneté")}</label>
-                      <div className="input bg-slate-50 tabular-nums text-slate-700">{formatXOF(seniorityOf(form))}</div>
-                    </div>
-                    <div>
-                      <button type="button" disabled={isClosed || suggestedRate === 0 || suggestedRate === form.taux_anciennete}
-                        onClick={() => setForm({ ...form, taux_anciennete: suggestedRate })} className="btn-secondary w-full">
-                        {t("Appliquer le taux suggéré")}
-                      </button>
-                    </div>
-                  </div>
-                  <p className="text-xs text-slate-500 mt-2">
-                    {t("Calculée sur le salaire de base et le sursalaire.")}{' '}
-                    {selectedEmp.hire_date ? `${t("Taux suggéré d'après la date d'embauche :")} ${suggestedRate} %` : t("Aucune date d'embauche renseignée.")}
-                  </p>
                 </div>
 
                 <div className="flex gap-3 mt-6">
@@ -305,8 +296,9 @@ export default function PayrollVariables() {
 
 function ResultRow({ label, value, negative, bold, muted }: { label: string; value: number; negative?: boolean; bold?: boolean; muted?: boolean }) {
   return (
-    <div className={`flex items-center justify-between py-1.5 ${bold ? 'text-base font-bold' : 'text-sm'}`}>
+    <div className={`flex items-baseline gap-2 py-1.5 ${bold ? 'text-base font-semibold' : 'text-sm'}`}>
       <span className={muted ? 'text-slate-500' : 'text-slate-700'}>{label}</span>
+      <span className="flex-1 border-b border-dotted border-slate-300 translate-y-[-3px]" aria-hidden />
       <span className={`tabular-nums ${negative ? 'text-error-600' : 'text-slate-900'} ${bold ? 'text-lg' : ''}`}>
         {negative ? '− ' : ''}{formatXOF(Math.abs(value))}
       </span>

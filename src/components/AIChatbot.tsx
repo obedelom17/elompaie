@@ -426,7 +426,7 @@ export function AIChatbot() {
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
           {messages.map((msg, i) => (
             <div key={i} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
-              <div className={`w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0 ${msg.role === 'user' ? 'bg-slate-100' : 'bg-primary-600'}`}>
+              <div className={`w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0 ${msg.role === 'user' ? 'bg-slate-100' : 'bg-[#6C63FF]'}`}>
                 {msg.role === 'user' ? <User className="w-4 h-4 text-slate-600" /> : <Bot className="w-4 h-4 text-white" />}
               </div>
               <div className="max-w-[80%] space-y-1">
@@ -444,7 +444,7 @@ export function AIChatbot() {
           ))}
           {loading && (
             <div className="flex gap-3">
-              <div className="w-8 h-8 rounded-md bg-primary-600 flex items-center justify-center flex-shrink-0">
+              <div className="w-8 h-8 rounded-md bg-[#6C63FF] flex items-center justify-center flex-shrink-0">
                 <Bot className="w-4 h-4 text-white" />
               </div>
               <div className="bg-slate-50 border border-slate-200 px-4 py-3 rounded-lg flex items-center gap-2">

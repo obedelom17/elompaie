@@ -66,12 +66,12 @@ export function SalaryHistoryChart({ variables }: Props) {
       <AreaChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
         <defs>
           <linearGradient id="gradBrut" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.15} />
-            <stop offset="95%" stopColor="#4f46e5" stopOpacity={0} />
+            <stop offset="5%" stopColor="#1f4e79" stopOpacity={0.15} />
+            <stop offset="95%" stopColor="#1f4e79" stopOpacity={0} />
           </linearGradient>
           <linearGradient id="gradNet" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="#10b981" stopOpacity={0.2} />
-            <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+            <stop offset="5%" stopColor="#2a9d8f" stopOpacity={0.2} />
+            <stop offset="95%" stopColor="#2a9d8f" stopOpacity={0} />
           </linearGradient>
         </defs>
         <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
@@ -79,8 +79,8 @@ export function SalaryHistoryChart({ variables }: Props) {
         <YAxis tickFormatter={v => `${Math.round(v / 1000)}k`} tick={{ fontSize: 10, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
         <Tooltip content={<CustomTooltip />} />
         <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
-        <Area type="monotone" dataKey="Brut" stroke="#4f46e5" strokeWidth={2} fill="url(#gradBrut)" dot={false} />
-        <Area type="monotone" dataKey="Net" stroke="#10b981" strokeWidth={2} fill="url(#gradNet)" dot={false} />
+        <Area type="monotone" dataKey="Brut" stroke="#1f4e79" strokeWidth={2} fill="url(#gradBrut)" dot={false} />
+        <Area type="monotone" dataKey="Net" stroke="#2a9d8f" strokeWidth={2} fill="url(#gradNet)" dot={false} />
         <Area type="monotone" dataKey="IRPP" stroke="#f59e0b" strokeWidth={1.5} fill="none" dot={false} strokeDasharray="4 2" />
       </AreaChart>
     </ResponsiveContainer>

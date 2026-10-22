@@ -118,7 +118,6 @@ export default function Simulator() {
                     { k: 'flat_deduction', l: t("Déduction forfaitaire") },
                     { k: 'salary_advance', l: t("Avance sur salaire") },
                     { k: 'loan_payment', l: t("Remboursement prêt") },
-                    { k: 'indemnite_grossesse', l: t('Ind. enceinte (exo.)') },
                   ].map(({ k, l }) => (
                     <div key={k}>
                       <label className="label">{l}</label>
@@ -164,7 +163,6 @@ export default function Simulator() {
 
               <div className="space-y-2 text-sm">
                 <Row l={t("Salaire brut")} v={result.gross_salary} />
-                {result.indemnite_grossesse > 0 && <Row l={t("dont ind. enceinte (exo.)")} v={result.indemnite_grossesse} muted />}
                 <Row l={t("CNSS salarié (4%)")} v={result.cnss_employee} neg />
                 <Row l={t("AMU salarié (5%)")} v={result.amu_employee} neg />
                 <Row l={t("Abattement 28%")} v={result.abattement_28} neg muted />

@@ -14,14 +14,14 @@
 @layer components {
   /* Boutons */
   .btn { @apply inline-flex items-center justify-center gap-2 rounded-md px-3.5 py-2 text-sm font-medium transition-colors duration-150 disabled:opacity-40 disabled:cursor-not-allowed select-none; }
-  .btn-primary { @apply btn bg-primary-600 text-white hover:bg-primary-700; }
+  .btn-primary { @apply btn bg-accent-600 text-white hover:bg-accent-700; }
   .btn-secondary { @apply btn bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 hover:border-slate-400; }
   .btn-danger { @apply btn bg-red-600 text-white hover:bg-red-700; }
   .btn-ghost { @apply btn text-slate-600 hover:bg-slate-100 hover:text-slate-900; }
   .btn-icon { @apply p-2 rounded-md transition-colors; }
 
   /* Champs */
-  .input { @apply w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-primary-600 focus:outline-none focus:ring-1 focus:ring-primary-600 transition-colors; }
+  .input { @apply w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-accent-600 focus:outline-none focus:ring-1 focus:ring-accent-600 transition-colors; }
   .label { @apply block text-xs font-medium text-slate-600 mb-1.5; }
 
   /* Surfaces */
@@ -45,7 +45,7 @@
 
   /* Notifications */
   .toast { @apply fixed bottom-6 right-6 z-[100] flex items-center gap-3 px-4 py-3 rounded-md text-sm font-medium shadow-modal animate-slide-up; }
-  .toast-success { @apply toast bg-primary-700 text-white; }
+  .toast-success { @apply toast bg-accent-700 text-white; }
   .toast-error { @apply toast bg-red-700 text-white; }
   .toast-info { @apply toast bg-slate-800 text-white; }
   .toast-warning { @apply toast bg-amber-600 text-white; }
@@ -72,7 +72,7 @@
 .animate-shimmer { @apply bg-slate-100; }
 
 /* Focus clavier visible */
-*:focus-visible { outline: 2px solid #4f46e5; outline-offset: 2px; }
+*:focus-visible { outline: 2px solid #238377; outline-offset: 2px; }
 input:focus-visible, select:focus-visible, textarea:focus-visible { outline: none; }
 
 /* Champs numériques sans flèches */
@@ -105,6 +105,6 @@ input[type=number] { -moz-appearance: textfield; }
 .breadcrumb span.current { @apply text-slate-700 font-medium; }
 .pagination { @apply flex items-center gap-1 mt-4 justify-center; }
 .pagination button { @apply px-3 py-1.5 rounded-md text-sm font-medium; }
-.pagination button.active { @apply bg-primary-600 text-white; }
+.pagination button.active { @apply bg-accent-600 text-white; }
 .pagination button:not(.active) { @apply bg-white border border-slate-200 text-slate-600 hover:border-slate-300; }
 .skeleton-line { @apply h-3 bg-slate-200 rounded; }

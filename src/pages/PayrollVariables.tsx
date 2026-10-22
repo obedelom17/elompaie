@@ -218,7 +218,6 @@ export default function PayrollVariables() {
                     { key: 'meal_premium', label: 'Prime repas' }, { key: 'transport_allowance', label: 'Ind. transport' },
                     { key: 'flat_deduction', label: t("Déduction forfaitaire") }, { key: 'salary_advance', label: 'Avance salaire' },
                     { key: 'loan_payment', label: t("Remb. prêt") },
-                    { key: 'indemnite_grossesse', label: 'Ind. enceinte' },
                   ].map(({ key, label }) => (
                     <div key={key}>
                       <label className="label">{label}</label>
@@ -276,7 +275,6 @@ export default function PayrollVariables() {
                   <div className="space-y-1">
                     <ResultRow label={t("Salaire brut")} value={result.gross_salary} />
                     {result.seniority_allowance > 0 && <ResultRow label={t("dont ind. ancienneté")} value={result.seniority_allowance} muted />}
-                    {result.indemnite_grossesse > 0 && <ResultRow label={t("dont ind. enceinte (exo.)")} value={result.indemnite_grossesse} muted />}
                     <ResultRow label={t("CNSS salarié (4%)")} value={-result.cnss_employee} negative />
                     <ResultRow label={t("AMU salarié (5%)")} value={-result.amu_employee} negative />
                     <ResultRow label={t("Abattement 28%")} value={-result.abattement_28} negative muted />

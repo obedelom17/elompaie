@@ -451,23 +451,23 @@ export default function ExportReports() {
               </div>
             ))}
             <button onClick={()=>setSJoursConges([...sJoursConges,{nb:'',label:''}])} className="text-primary-600 text-xs hover:underline">{t("+ Ajouter période")}</button>
-            {!sTauxAuto&&(<div className="mt-2"><label className={labelCls}>{t("Taux manuel")}</label><input type="number" step="0.001" className={inputCls} value={sTauxManuel} onChange={e=>setSTauxManuel(e.target.value)} /></div>)}
+            {!sTauxAuto&&(<div className="mt-2"><label className={labelCls}>{t("Taux manuel")}</label><input type="number" step="0.001" className={inputCls} value={sTauxManuel === '0' ? '' : sTauxManuel} placeholder="0" onChange={e=>setSTauxManuel(e.target.value)} /></div>)}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <div><label className={labelCls}>{t("Avance sur solde (FCFA)")}</label><input type="number" className={inputCls} value={sAvance} onChange={e=>setSAvance(e.target.value)} /></div>
-            <div><label className={labelCls}>{t("Retenues arriérées (FCFA)")}</label><input type="number" className={inputCls} value={sRetenuesArr} onChange={e=>setSRetenuesArr(e.target.value)} /></div>
+            <div><label className={labelCls}>{t("Avance sur solde (FCFA)")}</label><input type="number" className={inputCls} value={sAvance === '0' ? '' : sAvance} placeholder="0" onChange={e=>setSAvance(e.target.value)} /></div>
+            <div><label className={labelCls}>{t("Retenues arriérées (FCFA)")}</label><input type="number" className={inputCls} value={sRetenuesArr === '0' ? '' : sRetenuesArr} placeholder="0" onChange={e=>setSRetenuesArr(e.target.value)} /></div>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <div><label className={labelCls}>{t("Retenue sur solde (FCFA)")}</label><input type="number" className={inputCls} value={sRetenueSurSolde} onChange={e=>setSRetenueSurSolde(e.target.value)} /></div>
-            <div><label className={labelCls}>{t("Régularisation IRPP (FCFA)")}</label><input type="number" className={inputCls} value={sRegulIrpp} onChange={e=>setSRegulIrpp(e.target.value)} /></div>
+            <div><label className={labelCls}>{t("Retenue sur solde (FCFA)")}</label><input type="number" className={inputCls} value={sRetenueSurSolde === '0' ? '' : sRetenueSurSolde} placeholder="0" onChange={e=>setSRetenueSurSolde(e.target.value)} /></div>
+            <div><label className={labelCls}>{t("Régularisation IRPP (FCFA)")}</label><input type="number" className={inputCls} value={sRegulIrpp === '0' ? '' : sRegulIrpp} placeholder="0" onChange={e=>setSRegulIrpp(e.target.value)} /></div>
           </div>
 
           <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
             <input type="checkbox" checked={sInclurePreavis} onChange={e=>setSInclurePreavis(e.target.checked)} className="h-4 w-4 rounded" />
             {t("Inclure préavis")}
           </label>
-          {sInclurePreavis&&(<div><label className={labelCls}>{t("Montant du préavis (FCFA)")}</label><input type="number" className={inputCls} value={sPreavis} onChange={e=>setSPreavis(e.target.value)} /></div>)}
+          {sInclurePreavis&&(<div><label className={labelCls}>{t("Montant du préavis (FCFA)")}</label><input type="number" className={inputCls} value={sPreavis === '0' ? '' : sPreavis} placeholder="0" onChange={e=>setSPreavis(e.target.value)} /></div>)}
 
           <DownloadButton format={sFormat} loading={loading} onClick={async () => {
             if (!sEmployee)   return setMsg({type:'error',text:t("Sélectionne un employé")})

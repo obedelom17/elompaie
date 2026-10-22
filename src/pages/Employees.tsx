@@ -245,7 +245,7 @@ export default function Employees() {
                     {SITUATIONS.map(s=><option key={s} value={s}>{t(SITUATION_LABELS[s])}</option>)}
                   </select>
                 </div>
-                <div><label className={labelCls}>{t("Enfants à charge")}</label><input type="number" min={0} className={inputCls} value={form.children_count} onChange={e=>setForm({...form,children_count:parseInt(e.target.value)||0})} /></div>
+                <div><label className={labelCls}>{t("Enfants à charge")}</label><input type="number" min={0} className={inputCls} value={form.children_count === 0 ? '' : form.children_count} placeholder="0" onChange={e=>setForm({...form,children_count:parseInt(e.target.value)||0})} /></div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">

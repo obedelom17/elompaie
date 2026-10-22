@@ -85,7 +85,7 @@ export function Onboarding({ onDone }: Props) {
                       <option value="marie">{t("Marié(e)")}</option>
                     </select>
                     <div className="flex items-center gap-2"><label className="text-sm text-slate-600">{t("Enfants :")}</label>
-                      <input type="number" min="0" value={empForm.children_count} onChange={e => setEmpForm({...empForm, children_count: Number(e.target.value)})} className="input w-24" />
+                      <input type="number" min="0" value={empForm.children_count === 0 ? '' : empForm.children_count} placeholder="0" onChange={e => setEmpForm({...empForm, children_count: Number(e.target.value)})} className="input w-24" />
                     </div>
                   </div>
                 )}

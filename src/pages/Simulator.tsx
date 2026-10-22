@@ -80,7 +80,7 @@ export default function Simulator() {
                 </div>
                 <div>
                   <label className="label">{t("Enfants à charge")}</label>
-                  <input type="number" min="0" max="6" value={form.children_count}
+                  <input type="number" min="0" max="6" value={form.children_count === 0 ? '' : form.children_count} placeholder="0"
                     onChange={e => f('children_count', Number(e.target.value))} className="input" />
                 </div>
               </div>
@@ -100,7 +100,7 @@ export default function Simulator() {
                 ].map(({ k, l }) => (
                   <div key={k}>
                     <label className="label">{l}</label>
-                    <input type="number" min="0" value={(form as any)[k]}
+                    <input type="number" min="0" value={(form as any)[k] === 0 ? '' : (form as any)[k]} placeholder="0"
                       onChange={e => f(k as any, Number(e.target.value))} className="input" />
                   </div>
                 ))}
@@ -121,7 +121,7 @@ export default function Simulator() {
                   ].map(({ k, l }) => (
                     <div key={k}>
                       <label className="label">{l}</label>
-                      <input type="number" min="0" value={(form as any)[k]}
+                      <input type="number" min="0" value={(form as any)[k] === 0 ? '' : (form as any)[k]} placeholder="0"
                         onChange={e => f(k as any, Number(e.target.value))} className="input" />
                     </div>
                   ))}
@@ -213,11 +213,11 @@ export default function Simulator() {
             <h3 className="font-bold text-slate-900">{t("Paramètres")}</h3>
             <div>
               <label className="label">{t("Salaire brut mensuel (FCFA)")}</label>
-              <input type="number" min="0" value={sevSalary} onChange={e => setSevSalary(Number(e.target.value))} className="input" />
+              <input type="number" min="0" value={sevSalary === 0 ? '' : sevSalary} placeholder="0" onChange={e => setSevSalary(Number(e.target.value))} className="input" />
             </div>
             <div>
               <label className="label">{t("Années de service")}</label>
-              <input type="number" min="0" max="50" value={sevYears} onChange={e => setSevYears(Number(e.target.value))} className="input" />
+              <input type="number" min="0" max="50" value={sevYears === 0 ? '' : sevYears} placeholder="0" onChange={e => setSevYears(Number(e.target.value))} className="input" />
             </div>
             <div>
               <label className="label">{t("Catégorie professionnelle")}</label>
@@ -278,15 +278,15 @@ export default function Simulator() {
                   </div>
                   <div>
                     <label className="label">{t("Enfants")}</label>
-                    <input type="number" min="0" max="6" value={fm.children_count} onChange={e => setF('children_count', Number(e.target.value))} className="input" />
+                    <input type="number" min="0" max="6" value={fm.children_count === 0 ? '' : fm.children_count} placeholder="0" onChange={e => setF('children_count', Number(e.target.value))} className="input" />
                   </div>
                   <div>
                     <label className="label">{t("Salaire de base")}</label>
-                    <input type="number" min="0" value={fm.base_salary} onChange={e => setF('base_salary', Number(e.target.value))} className="input" />
+                    <input type="number" min="0" value={fm.base_salary === 0 ? '' : fm.base_salary} placeholder="0" onChange={e => setF('base_salary', Number(e.target.value))} className="input" />
                   </div>
                   <div>
                     <label className="label">{t("Primes total")}</label>
-                    <input type="number" min="0" value={fm.function_allowance} onChange={e => setF('function_allowance', Number(e.target.value))} className="input" />
+                    <input type="number" min="0" value={fm.function_allowance === 0 ? '' : fm.function_allowance} placeholder="0" onChange={e => setF('function_allowance', Number(e.target.value))} className="input" />
                   </div>
                 </div>
               </div>

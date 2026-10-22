@@ -21,7 +21,7 @@ const en: Record<string, string> = {
   'CDD arrivant à terme': 'Fixed-term contracts ending soon',
 
   // Assistant
-  'PaieBot IA': 'PaieBot AI',
+  'ElomPaie AI': 'ElomPaie AI',
   'Groq · Llama 3.3 70B + Outils': 'Groq · Llama 3.3 70B + tools',
   'Effacer': 'Clear',
   'Réflexion...': 'Thinking...',
@@ -34,8 +34,8 @@ const en: Record<string, string> = {
   'Impossible de récupérer les statistiques': 'Unable to load statistics',
   'Calcul de paie': 'Payroll calculation',
   'Recherche employé': 'Employee search',
-  'Bonjour ! Je suis PaieBot, votre assistant paie Togo.\n\nJe peux vous aider avec :\n- Calculs de paie (IRPP, CNSS, AMU)\n- Questions CGI OTR 2025\n- Code du Travail 2021\n- Indemnités et primes\n- Consultation de vos données (employés, périodes)\n\nQue puis-je faire pour vous ?':
-    'Hello! I am PaieBot, your Togo payroll assistant.\n\nI can help with:\n- Payroll calculations (income tax, CNSS, AMU)\n- Questions on the 2025 OTR tax code\n- Labour Code 2021\n- Allowances and bonuses\n- Looking up your data (employees, periods)\n\nWhat can I do for you?',
+  'Bonjour ! Je suis ElomPaie AI, votre assistant paie Togo.\n\nJe peux vous aider avec :\n- Calculs de paie (IRPP, CNSS, AMU)\n- Questions CGI OTR 2025\n- Code du Travail 2021\n- Indemnités et primes\n- Consultation de vos données (employés, périodes)\n\nQue puis-je faire pour vous ?':
+    'Hello! I am ElomPaie AI, your Togo payroll assistant.\n\nI can help with:\n- Payroll calculations (income tax, CNSS, AMU)\n- Questions on the 2025 OTR tax code\n- Labour Code 2021\n- Allowances and bonuses\n- Looking up your data (employees, periods)\n\nWhat can I do for you?',
   'Désolé, je ne peux pas répondre.': 'Sorry, I cannot answer that.',
   'Calcul paie 500 000F marié 2 enfants': 'Payroll 500,000 F married 2 children',
   'Stats du cabinet': 'Firm statistics',

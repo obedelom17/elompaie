@@ -14,6 +14,7 @@ import ExportReports from './pages/ExportReports'
 import ActivityLog from './pages/ActivityLog'
 import Settings from './pages/Settings'
 import Layout from './components/Layout'
+import { AIChatbot } from './components/AIChatbot'
 import { LogoMark } from './components/Logo'
 import { useLang } from './lib/i18n'
 
@@ -33,6 +34,7 @@ function ProtectedRoutes() {
     <Layout>
       <Routes key={lang}>
         <Route path="/" element={<Dashboard />} />
+        <Route path="/assistant" element={<AIChatbot />} />
         <Route path="/clients" element={<Clients />} />
         <Route path="/clients/:id" element={<ClientDetail />} />
         <Route path="/employees" element={<Employees />} />

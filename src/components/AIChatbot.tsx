@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { MessageCircle, X, Send, Bot, User, Loader2, Minimize2, Maximize2, Trash2, Wrench } from 'lucide-react'
+import { Send, Bot, User, Loader2, Trash2, Wrench } from 'lucide-react'
 import { calculatePayroll, formatXOF } from '../lib/payroll'
 import { t, getLang } from '../lib/i18n'
 
@@ -212,7 +212,7 @@ async function executeTool(name: string, args: Record<string, any>): Promise<str
 }
 
 // ─── Prompt système ───────────────────────────────────────────────────────────
-const SYSTEM_PROMPT = `Tu es PaieBot, assistant IA expert en paie et droit du travail au Togo, intégré dans ElomPaie.
+const SYSTEM_PROMPT = `Tu es ElomPaie AI, assistant IA expert en paie et droit du travail au Togo, intégré dans ElomPaie.
 
 Tu as accès à des outils pour interagir avec la base de données de l'utilisateur :
 - calculer_paie : calcule immédiatement tout bulletin de paie
@@ -253,29 +253,27 @@ function ToolCallBadge({ call }: { call: ToolCall }) {
 }
 
 // ─── Composant principal ──────────────────────────────────────────────────────
+// L'historique est conservé quand on change de page.
+let savedMessages: Message[] | null = null
+
 export function AIChatbot() {
-  const [open, setOpen] = useState(false)
-  const [minimized, setMinimized] = useState(false)
-  const [messages, setMessages] = useState<Message[]>([
+  const [messages, setMessages] = useState<Message[]>(savedMessages ?? [
     {
       role: 'assistant',
-      content: t("Bonjour ! Je suis PaieBot, votre assistant paie Togo.\n\nJe peux vous aider avec :\n- Calculs de paie (IRPP, CNSS, AMU)\n- Questions CGI OTR 2025\n- Code du Travail 2021\n- Indemnités et primes\n- Consultation de vos données (employés, périodes)\n\nQue puis-je faire pour vous ?"),
+      content: t("Bonjour ! Je suis ElomPaie AI, votre assistant paie Togo.\n\nJe peux vous aider avec :\n- Calculs de paie (IRPP, CNSS, AMU)\n- Questions CGI OTR 2025\n- Code du Travail 2021\n- Indemnités et primes\n- Consultation de vos données (employés, périodes)\n\nQue puis-je faire pour vous ?"),
       ts: Date.now(),
     }
   ])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
-  const [unread, setUnread] = useState(0)
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
-  useEffect(() => {
-    if (open) { setUnread(0); setTimeout(() => inputRef.current?.focus(), 100) }
-  }, [open])
+  useEffect(() => { inputRef.current?.focus() }, [])
 
   useEffect(() => {
+    savedMessages = messages
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-    if (!open && messages[messages.length - 1]?.role === 'assistant') setUnread(n => n + 1)
   }, [messages])
 
   // ─── Envoi avec tool calling ─────────────────────────────────────────────
@@ -414,138 +412,79 @@ export function AIChatbot() {
     return html.join('')
   }
 
-  // ─── Bouton flottant ──────────────────────────────────────────────────────
-  if (!open) {
-    return (
-      <button
-        onClick={() => setOpen(true)}
-        className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-lg bg-primary-600 text-white shadow-modal transition-all duration-300 flex items-center justify-center"
-      >
-        <MessageCircle className="w-6 h-6" />
-        {unread > 0 && (
-          <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-xs flex items-center justify-center font-bold">
-            {unread}
-          </span>
-        )}
-      </button>
-    )
-  }
-
-  // ─── Fenêtre chat ─────────────────────────────────────────────────────────
   return (
-    <div className={`fixed bottom-6 right-6 z-50 flex flex-col bg-white rounded-xl shadow-modal border border-slate-100 transition-all duration-300 ${minimized ? 'h-16 w-72' : 'h-[620px] w-[390px]'}`}>
-      {/* Header */}
-      <div className="flex items-center gap-3 px-5 py-4 bg-primary-600 rounded-t-3xl flex-shrink-0">
-        <div className="w-9 h-9 rounded-md bg-white/20 flex items-center justify-center">
-          <Bot className="w-5 h-5 text-white" />
+    <div className="flex flex-col h-[calc(100vh-7rem)] lg:h-[calc(100vh-8rem)] max-w-4xl mx-auto">
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">{t("ElomPaie AI")}</h1>
+        <button onClick={clear} className="btn-secondary" title={t("Effacer")}>
+          <Trash2 className="w-4 h-4" />
+          {t("Effacer")}
+        </button>
+      </div>
+
+      <div className="card flex-1 flex flex-col min-h-0">
+        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+          {messages.map((msg, i) => (
+            <div key={i} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
+              <div className={`w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0 ${msg.role === 'user' ? 'bg-slate-100' : 'bg-primary-600'}`}>
+                {msg.role === 'user' ? <User className="w-4 h-4 text-slate-600" /> : <Bot className="w-4 h-4 text-white" />}
+              </div>
+              <div className="max-w-[80%] space-y-1">
+                {msg.toolCalls?.map(tc => <ToolCallBadge key={tc.id} call={tc} />)}
+                {msg.content && (
+                  <div
+                    className={`px-4 py-3 rounded-lg text-sm leading-relaxed ${
+                      msg.role === 'user' ? 'bg-primary-600 text-white' : 'bg-slate-50 text-slate-800 border border-slate-200'
+                    }`}
+                    dangerouslySetInnerHTML={{ __html: renderContent(msg.content) }}
+                  />
+                )}
+              </div>
+            </div>
+          ))}
+          {loading && (
+            <div className="flex gap-3">
+              <div className="w-8 h-8 rounded-md bg-primary-600 flex items-center justify-center flex-shrink-0">
+                <Bot className="w-4 h-4 text-white" />
+              </div>
+              <div className="bg-slate-50 border border-slate-200 px-4 py-3 rounded-lg flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin text-primary-600" />
+                <span className="text-sm text-slate-500">{t("Réflexion...")}</span>
+              </div>
+            </div>
+          )}
+          <div ref={bottomRef} />
         </div>
-        <div className="flex-1">
-          <p className="text-white font-bold text-sm">{t("PaieBot IA")}</p>
-          <div className="flex items-center gap-1.5">
-            <span className="w-2 h-2 bg-emerald-400 rounded-full" />
-            <p className="text-white/70 text-xs">{t("Groq · Llama 3.3 70B + Outils")}</p>
-          </div>
+
+        <div className="px-5 pb-2 flex gap-2 overflow-x-auto">
+          {[
+            t("Calcul paie 500 000F marié 2 enfants"),
+            t("Stats du cabinet"),
+            t("Périodes ouvertes"),
+          ].map(s => (
+            <button key={s} onClick={() => { setInput(s); inputRef.current?.focus() }}
+              className="text-xs bg-white hover:bg-slate-50 border border-slate-200 text-slate-600 px-3 py-1.5 rounded-md whitespace-nowrap transition-colors flex-shrink-0">
+              {s}
+            </button>
+          ))}
         </div>
-        <div className="flex items-center gap-1">
-          <button onClick={clear} className="p-1.5 rounded-lg hover:bg-white/20 text-white/70 hover:text-white transition-colors" title={t("Effacer")}>
-            <Trash2 className="w-4 h-4" />
-          </button>
-          <button onClick={() => setMinimized(!minimized)} className="p-1.5 rounded-lg hover:bg-white/20 text-white/70 hover:text-white transition-colors">
-            {minimized ? <Maximize2 className="w-4 h-4" /> : <Minimize2 className="w-4 h-4" />}
-          </button>
-          <button onClick={() => setOpen(false)} className="p-1.5 rounded-lg hover:bg-white/20 text-white/70 hover:text-white transition-colors">
-            <X className="w-4 h-4" />
+
+        <div className="p-4 border-t border-slate-200 flex gap-2 items-end">
+          <textarea
+            ref={inputRef}
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={handleKey}
+            placeholder={t("Posez votre question sur la paie...")}
+            rows={1}
+            className="flex-1 resize-none input py-2.5 text-sm max-h-32"
+            style={{ minHeight: '40px' }}
+          />
+          <button onClick={send} disabled={loading || !input.trim()} className="btn-primary p-2.5 flex-shrink-0">
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
           </button>
         </div>
       </div>
-
-      {!minimized && (
-        <>
-          {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3">
-            {messages.map((msg, i) => (
-              <div key={i} className={`flex gap-2.5 ${msg.role === 'user' ? 'flex-row-reverse' : ''} animate-fade-in`}>
-                <div className={`w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0 ${
-                  msg.role === 'user'
-                    ? 'bg-primary-100'
-                    : 'bg-primary-600'
-                }`}>
-                  {msg.role === 'user'
-                    ? <User className="w-4 h-4 text-primary-600" />
-                    : <Bot className="w-4 h-4 text-white" />
-                  }
-                </div>
-                <div className="max-w-[80%] space-y-1">
-                  {/* Tool call badges */}
-                  {msg.toolCalls?.map(tc => <ToolCallBadge key={tc.id} call={tc} />)}
-                  {/* Contenu texte */}
-                  {msg.content && (
-                    <div
-                      className={`px-4 py-3 rounded-lg text-sm leading-relaxed ${
-                        msg.role === 'user'
-                          ? 'bg-primary-600 text-white rounded-tr-sm'
-                          : 'bg-slate-50 text-slate-800 rounded-tl-sm border border-slate-100'
-                      }`}
-                      dangerouslySetInnerHTML={{ __html: renderContent(msg.content) }}
-                    />
-                  )}
-                </div>
-              </div>
-            ))}
-            {loading && (
-              <div className="flex gap-2.5 animate-fade-in">
-                <div className="w-8 h-8 rounded-md bg-primary-600 flex items-center justify-center flex-shrink-0">
-                  <Bot className="w-4 h-4 text-white" />
-                </div>
-                <div className="bg-slate-50 border border-slate-100 px-4 py-3 rounded-lg rounded-tl-sm flex items-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin text-primary-500" />
-                  <span className="text-sm text-slate-400">{t("Réflexion...")}</span>
-                </div>
-              </div>
-            )}
-            <div ref={bottomRef} />
-          </div>
-
-          {/* Suggestions */}
-          <div className="px-4 pb-2 flex gap-2 overflow-x-auto">
-            {[
-              t("Calcul paie 500 000F marié 2 enfants"),
-              t("Stats du cabinet"),
-              'SMIG Togo 2025',
-              t("Périodes ouvertes"),
-            ].map(s => (
-              <button
-                key={s}
-                onClick={() => { setInput(s); inputRef.current?.focus() }}
-                className="text-xs bg-slate-50 hover:bg-primary-50 hover:text-primary-700 border border-slate-200 hover:border-primary-200 text-slate-600 px-3 py-1.5 rounded-full whitespace-nowrap transition-all duration-200 flex-shrink-0"
-              >
-                {s}
-              </button>
-            ))}
-          </div>
-
-          {/* Input */}
-          <div className="p-4 border-t border-slate-100 flex gap-2 items-end">
-            <textarea
-              ref={inputRef}
-              value={input}
-              onChange={e => setInput(e.target.value)}
-              onKeyDown={handleKey}
-              placeholder={t("Posez votre question sur la paie...")}
-              rows={1}
-              className="flex-1 resize-none input py-2.5 text-sm max-h-32"
-              style={{ minHeight: '40px' }}
-            />
-            <button
-              onClick={send}
-              disabled={loading || !input.trim()}
-              className="btn-primary p-2.5 rounded-md disabled:opacity-40 flex-shrink-0"
-            >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-            </button>
-          </div>
-        </>
-      )}
     </div>
   )
 }

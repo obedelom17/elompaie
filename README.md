@@ -21,7 +21,7 @@ Application en ligne : https://elompaie.vercel.app
 - Indemnité d'ancienneté calculée à partir du salaire (voir plus bas).
 - Simulateur de bulletin, d'indemnité de licenciement et comparaison de deux profils.
 - Exports : bulletins (Excel, PDF, PNG), état des charges, bordereau CNSS/AMU, déclaration IRPP, solde de tout compte.
-- PaieBot, assistant qui calcule une paie et interroge les données du cabinet.
+- ElomPaie AI, assistant qui calcule une paie et interroge les données du cabinet.
 - Interface bilingue français / anglais, avec un sélecteur FR | EN dans l'en-tête et sur la page de connexion. Le choix est mémorisé dans le navigateur.
 
 ### Conformité légale
@@ -69,7 +69,7 @@ Tous les écrans existent en français et en anglais. Les textes sont déclarés
 - Neon (PostgreSQL) et Neon Auth pour l'authentification
 - Vercel Blob pour les logos et l'archivage des bulletins
 - ExcelJS et jsPDF pour les exports
-- Groq (Llama 3.3 70B) pour PaieBot
+- Groq (Llama 3.3 70B) pour ElomPaie AI
 
 ### Installation locale
 
@@ -98,7 +98,7 @@ npm run dev
 | `VITE_NEON_AUTH_URL`   | Adresse du service Neon Auth (navigateur)                 |
 | `BETTER_AUTH_URL`      | URL publique de l'application                             |
 | `BLOB_READ_WRITE_TOKEN`| Jeton Vercel Blob                                         |
-| `GROQ_API_KEY`         | Clé Groq pour PaieBot, lue uniquement côté serveur        |
+| `GROQ_API_KEY`         | Clé Groq pour ElomPaie AI, lue uniquement côté serveur        |
 
 ### Structure du projet
 
@@ -106,7 +106,7 @@ npm run dev
 api/         Fonctions serverless (routes, calculs, exports Excel)
 public/      Icônes, manifeste, image de partage
 src/
-  components/  Mise en page, logo, sélecteur de langue, PaieBot
+  components/  Mise en page, logo, sélecteur de langue, ElomPaie AI
   context/     Authentification
   lib/         Moteur de paie, PDF, client API, internationalisation
   pages/       Écrans de l'application
@@ -133,7 +133,7 @@ Live application: https://elompaie.vercel.app
 - Seniority allowance calculated from salary (see below).
 - Payslip simulator, severance pay simulator and side-by-side comparison of two profiles.
 - Exports: payslips (Excel, PDF, PNG), statement of charges, CNSS/AMU schedule, income tax return, final settlement.
-- PaieBot, an assistant that runs payroll calculations and queries the firm's data.
+- ElomPaie AI, an assistant that runs payroll calculations and queries the firm's data.
 - Bilingual French / English interface, with an FR | EN switch in the header and on the sign-in page. The choice is remembered in the browser.
 
 ### Legal compliance
@@ -181,7 +181,7 @@ Every screen is available in French and English. Texts are declared in `src/lib/
 - Neon (PostgreSQL) and Neon Auth for authentication
 - Vercel Blob for logos and payslip archiving
 - ExcelJS and jsPDF for exports
-- Groq (Llama 3.3 70B) for PaieBot
+- Groq (Llama 3.3 70B) for ElomPaie AI
 
 ### Local setup
 
@@ -210,7 +210,7 @@ npm run dev
 | `VITE_NEON_AUTH_URL`   | Neon Auth service address (browser)                       |
 | `BETTER_AUTH_URL`      | Public URL of the application                             |
 | `BLOB_READ_WRITE_TOKEN`| Vercel Blob token                                         |
-| `GROQ_API_KEY`         | Groq key for PaieBot, read on the server only             |
+| `GROQ_API_KEY`         | Groq key for ElomPaie AI, read on the server only             |
 
 ### Project structure
 
@@ -218,7 +218,7 @@ npm run dev
 api/         Serverless functions (routes, calculations, Excel exports)
 public/      Icons, manifest, share image
 src/
-  components/  Layout, logo, language switch, PaieBot
+  components/  Layout, logo, language switch, ElomPaie AI
   context/     Authentication
   lib/         Payroll engine, PDF, API client, internationalisation
   pages/       Application screens

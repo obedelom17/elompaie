@@ -60,8 +60,8 @@
 /* Barres de défilement */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #c3c9c1; border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: #8d968c; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
 /* Animations utilisées par les classes nommées */
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -72,7 +72,7 @@
 .animate-shimmer { @apply bg-slate-100; }
 
 /* Focus clavier visible */
-*:focus-visible { outline: 2px solid #14604a; outline-offset: 2px; }
+*:focus-visible { outline: 2px solid #4f46e5; outline-offset: 2px; }
 input:focus-visible, select:focus-visible, textarea:focus-visible { outline: none; }
 
 /* Champs numériques sans flèches */

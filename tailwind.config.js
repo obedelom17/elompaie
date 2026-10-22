@@ -5,27 +5,23 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Vert encre, repris du drapeau togolais, tenu sobre.
         primary: {
-          50: '#eef6f2', 100: '#d8eae1', 200: '#b3d5c4', 300: '#83b9a1', 400: '#4f9779',
-          500: '#2c7a5d', 600: '#14604a', 700: '#0e4f3c', 800: '#0b3f31', 900: '#082e24', 950: '#041a14',
+          50: '#eef2ff', 100: '#e0e7ff', 200: '#c7d2fe', 300: '#a5b4fc',
+          400: '#818cf8', 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca',
+          800: '#3730a3', 900: '#312e81', 950: '#1e1b4b',
         },
-        // Or du drapeau, réservé aux accents rares.
         accent: {
-          50: '#fbf6e8', 100: '#f5eac6', 200: '#ecd68f', 300: '#e0be58', 400: '#d4a93a',
-          500: '#c4952b', 600: '#a3771f', 700: '#7e5a19', 800: '#5f4416', 900: '#463314',
+          50: '#fdf4ff', 100: '#fae8ff', 200: '#f5d0fe', 300: '#f0abfc',
+          400: '#e879f9', 500: '#d946ef', 600: '#c026d3', 700: '#a21caf',
+          800: '#86198f', 900: '#701a75',
         },
-        // Neutres légèrement teintés de vert pour s'accorder au primaire.
-        slate: {
-          50: '#f6f7f5', 100: '#eceee9', 200: '#dde1db', 300: '#c3c9c1', 400: '#8d968c',
-          500: '#667064', 600: '#4d564c', 700: '#394038', 800: '#272d27', 900: '#171c17', 950: '#0d110d',
-        },
+        gold: { 50: '#fffbeb', 100: '#fef3c7', 400: '#fbbf24', 500: '#f59e0b', 600: '#d97706' },
         success: { 50: '#f0fdf4', 100: '#dcfce7', 500: '#22c55e', 600: '#16a34a', 700: '#15803d' },
         warning: { 50: '#fffbeb', 100: '#fef3c7', 500: '#f59e0b', 600: '#d97706', 700: '#b45309' },
         error: { 50: '#fef2f2', 100: '#fee2e2', 500: '#ef4444', 600: '#dc2626', 700: '#b91c1c' },
       },
       fontFamily: {
-        sans: ['"IBM Plex Sans"', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
+        sans: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
       },
       animation: {
         'fade-in': 'fadeIn 0.18s ease-out',

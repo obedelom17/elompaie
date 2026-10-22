@@ -1,22 +1,24 @@
+import { lazy, Suspense } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import AuthPage from './pages/AuthPage'
-import Dashboard from './pages/Dashboard'
-import Clients from './pages/Clients'
-import ClientDetail from './pages/ClientDetail'
-import Employees from './pages/Employees'
-import EmployeeDetail from './pages/EmployeeDetail'
-import SalaryGrids from './pages/SalaryGrids'
-import PayrollPeriods from './pages/PayrollPeriods'
-import PayrollVariables from './pages/PayrollVariables'
-import Simulator from './pages/Simulator'
-import ExportReports from './pages/ExportReports'
-import ActivityLog from './pages/ActivityLog'
-import Settings from './pages/Settings'
 import Layout from './components/Layout'
-import { AIChatbot } from './components/AIChatbot'
 import { LogoMark } from './components/Logo'
 import { useLang } from './lib/i18n'
+
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const Clients = lazy(() => import('./pages/Clients'))
+const ClientDetail = lazy(() => import('./pages/ClientDetail'))
+const Employees = lazy(() => import('./pages/Employees'))
+const EmployeeDetail = lazy(() => import('./pages/EmployeeDetail'))
+const SalaryGrids = lazy(() => import('./pages/SalaryGrids'))
+const PayrollPeriods = lazy(() => import('./pages/PayrollPeriods'))
+const PayrollVariables = lazy(() => import('./pages/PayrollVariables'))
+const Simulator = lazy(() => import('./pages/Simulator'))
+const ExportReports = lazy(() => import('./pages/ExportReports'))
+const ActivityLog = lazy(() => import('./pages/ActivityLog'))
+const Settings = lazy(() => import('./pages/Settings'))
+const AIChatbot = lazy(() => import('./components/AIChatbot').then(m => ({ default: m.AIChatbot })))
 
 function ProtectedRoutes() {
   const { user, loading } = useAuth()
@@ -32,6 +34,7 @@ function ProtectedRoutes() {
   if (!user) return <Navigate to="/auth" replace />
   return (
     <Layout>
+      <Suspense fallback={<div className="flex justify-center py-24"><div className="animate-spin rounded-full h-6 w-6 border-2 border-slate-200 border-t-accent-600" /></div>}>
       <Routes key={lang}>
         <Route path="/" element={<Dashboard />} />
         <Route path="/assistant" element={<AIChatbot />} />
@@ -48,6 +51,7 @@ function ProtectedRoutes() {
         <Route path="/settings" element={<Settings />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </Suspense>
     </Layout>
   )
 }

@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { employeesApi, payrollApi } from '../lib/api'
-import { ArrowLeft, User, CalendarClock, FileText, AlertTriangle, TrendingUp } from 'lucide-react'
+import { ArrowLeft, FileText } from 'lucide-react'
 import { SalaryHistoryChart } from '../components/SalaryHistoryChart'
-import { formatXOF, calculateSeverancePay, calcAnciennete, calcIndemniteMaladie, calcIndemniteCongésNonPris, calcIndemniteMaterniteMensuelle } from '../lib/payroll'
+import { formatXOF, calculateSeverancePay, calcAnciennete, calcIndemniteCongésNonPris } from '../lib/payroll'
+import { SectionTitle, LeaderRow } from '../components/SectionTitle'
 import { t, monthName, locale } from '../lib/i18n'
 
 type EmployeeStatus = 'actif' | 'suspendu' | 'retraite' | 'decede'
@@ -75,7 +76,7 @@ export default function EmployeeDetail() {
 
       {payrollHistory.length > 0 && (
         <div className="card p-6">
-          <h2 className="font-semibold text-slate-900 mb-4 flex items-center gap-2"><TrendingUp className="w-5 h-5 text-primary-500" /> {t("Historique de paie")}</h2>
+          <SectionTitle>{t("Historique de paie")}</SectionTitle>
           <SalaryHistoryChart variables={payrollHistory} />
           <div className="mt-4 space-y-2">
             {payrollHistory.slice(0, 6).map((v, i) => (
@@ -90,8 +91,8 @@ export default function EmployeeDetail() {
 
       {showSolde && anciennete && lastVar && (
         <div className="card p-6 border-l-4 border-l-amber-400">
-          <h2 className="font-semibold text-slate-900 mb-4 flex items-center gap-2"><AlertTriangle className="w-5 h-5 text-amber-500" /> {t("Solde de tout compte estimatif")}</h2>
-          <div className="space-y-2 text-sm">
+          <SectionTitle>{t("Solde de tout compte estimatif")}</SectionTitle>
+          <div className="text-sm">
             <SoldeRow label={t("Préavis (1 mois)")} value={lastVar.net_payable||0} />
             {severance !== null && <SoldeRow label={t("Indemnité de licenciement")} value={severance} />}
             <SoldeRow label={t("Congés non pris (estimé)")} value={calcIndemniteCongésNonPris(lastVar.base_salary||0, anciennete.years * 12 + anciennete.months).montant} />
@@ -105,10 +106,5 @@ export default function EmployeeDetail() {
 }
 
 function SoldeRow({ label, value, bold }: { label: string; value: number; bold?: boolean }) {
-  return (
-    <div className={`flex justify-between ${bold ? 'font-bold text-base' : ''}`}>
-      <span className="text-slate-600">{label}</span>
-      <span className="text-slate-900 tabular-nums">{formatXOF(value)}</span>
-    </div>
-  )
+  return <LeaderRow label={label} bold={bold}>{formatXOF(value)}</LeaderRow>
 }

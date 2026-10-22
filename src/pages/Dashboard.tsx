@@ -7,6 +7,7 @@ import { CountUp } from '../components/ui/CountUp'
 import { CardSkeleton } from '../components/ui/Skeleton'
 import { formatXOF } from '../lib/payroll'
 import { Onboarding } from '../components/Onboarding'
+import { SectionTitle } from '../components/SectionTitle'
 import { t, locale } from '../lib/i18n'
 
 interface Stats { clientCount: number; employeeCount: number; openPeriods: number; closedPeriods: number; totalNetPay: number; totalEmployer: number }
@@ -96,8 +97,9 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <section className="lg:col-span-2">
-          <div className="flex items-baseline justify-between mb-3">
-            <h2 className="text-base font-semibold text-slate-900">{t("Périodes récentes")}</h2>
+          <div className="flex items-center gap-3 mb-3">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500">{t("Périodes récentes")}</h2>
+            <span className="flex-1 h-px bg-slate-200" aria-hidden />
             <Link to="/payroll" className="text-sm text-primary-700 hover:underline">{t("Tout voir")}</Link>
           </div>
           <div className="card divide-y divide-slate-100">
@@ -118,7 +120,7 @@ export default function Dashboard() {
         </section>
 
         <section>
-          <h2 className="text-base font-semibold text-slate-900 mb-3">{t("Actions rapides")}</h2>
+          <SectionTitle className="mb-3">{t("Actions rapides")}</SectionTitle>
           <div className="card divide-y divide-slate-100">
             {shortcuts.map(item => (
               <Link key={item.to} to={item.to} className="flex items-center gap-3 px-4 py-3.5 hover:bg-slate-50 transition-colors">

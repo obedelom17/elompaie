@@ -62,13 +62,13 @@ export default function PayrollPeriods() {
         <div className="space-y-8">
           {openPeriods.length > 0 && (
             <div>
-              <h2 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><Clock className="w-4 h-4 text-amber-500" /> {t("Périodes ouvertes (")}{openPeriods.length})</h2>
+              <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 pb-2 border-b border-slate-200"><span></span> {t("Périodes ouvertes (")}{openPeriods.length})</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{openPeriods.map(p => <PeriodCard key={p.id} period={p} onClose={() => setClosing(p.id)} />)}</div>
             </div>
           )}
           {closedPeriods.length > 0 && (
             <div>
-              <h2 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-500" /> {t("Périodes clôturées (")}{closedPeriods.length})</h2>
+              <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3 pb-2 border-b border-slate-200"><span></span> {t("Périodes clôturées (")}{closedPeriods.length})</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{closedPeriods.map(p => <PeriodCard key={p.id} period={p} />)}</div>
             </div>
           )}

@@ -38,7 +38,7 @@ function Section({ title, subtitle, icon: Icon, children }: {
           </div>
         )}
         <div>
-          <h2 className="font-bold text-slate-900 text-base">{title}</h2>
+          <h2 className="font-semibold text-slate-900 text-base">{title}</h2>
           {subtitle && <p className="text-sm text-slate-500 mt-0.5">{subtitle}</p>}
         </div>
       </div>

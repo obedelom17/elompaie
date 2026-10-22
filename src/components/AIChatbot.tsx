@@ -385,7 +385,10 @@ export function AIChatbot() {
     ts: Date.now(),
   }])
 
-  function renderContent(content: string) {
+  const escapeHtml = (v: string) => v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+
+  function renderContent(raw: string) {
+    const content = escapeHtml(raw)
     const lines = content.split('\n')
     const html: string[] = []
     let i = 0

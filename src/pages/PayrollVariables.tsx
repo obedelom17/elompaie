@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { payrollApi, employeesApi } from '../lib/api'
-import { useAuth } from '../context/AuthContext'
 import { calculatePayroll, formatXOF, PayrollResult } from '../lib/payroll'
-import { ArrowLeft, Calculator, FileText, Save, Lock, Loader2, Search, Info, Download } from 'lucide-react'
+import { ArrowLeft, Calculator, Save, Lock, Loader2, Search, Info, Download } from 'lucide-react'
 import { t, monthName } from '../lib/i18n'
 
 interface Employee { id: string; first_name: string; last_name: string; matricule: string|null; position: string|null; category: string|null; marital_status: string; children_count: number; client_id: string; email: string|null; phone: string|null; social_security_number: string|null; hire_date: string|null; client_name?: string }
@@ -12,7 +11,6 @@ const EMPTY_VARS = { base_salary: 0, seniority_allowance: 0, overtime_premium: 0
 
 export default function PayrollVariables() {
   const { periodId } = useParams<{ periodId: string }>()
-  const { org } = useAuth()
   const [period, setPeriod] = useState<any>(null)
   const [employees, setEmployees] = useState<Employee[]>([])
   const [variables, setVariables] = useState<Map<string, any>>(new Map())

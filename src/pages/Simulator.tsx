@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { calculatePayroll, formatXOF, calculateSeverancePay, getPreavisDays, PayrollInput } from '../lib/payroll'
 import { FlaskConical, Calculator, RefreshCw, TrendingUp, Users, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react'
+import { SectionTitle, LeaderRow } from '../components/SectionTitle'
 import { t } from '../lib/i18n'
 
 const EMPTY: PayrollInput = {
@@ -67,7 +68,7 @@ export default function Simulator() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="space-y-5">
             <div className="card p-6">
-              <h3 className="font-bold text-slate-900 mb-4">{t("Informations personnelles")}</h3>
+              <SectionTitle index={1}>{t("Informations personnelles")}</SectionTitle>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="label">{t("Situation matrimoniale")}</label>
@@ -87,7 +88,7 @@ export default function Simulator() {
             </div>
 
             <div className="card p-6">
-              <h3 className="font-bold text-slate-900 mb-4">{t("Éléments de salaire")}</h3>
+              <SectionTitle index={2}>{t("Éléments de salaire")}</SectionTitle>
               <div className="grid grid-cols-2 gap-3">
                 {[
                   { k: 'base_salary', l: t("Salaire de base *") },
@@ -142,10 +143,7 @@ export default function Simulator() {
           {/* Résultat */}
           {result ? (
             <div className="card p-6 page-enter">
-              <h3 className="font-bold text-slate-900 mb-5 flex items-center gap-2">
-                <div className="w-2 h-2 bg-emerald-400 rounded-full" />
-                {t("Résultat simulé")}
-              </h3>
+              <SectionTitle className="mb-5">{t("Résultat simulé")}</SectionTitle>
 
               {/* Gauge visuelle */}
               <div className="mb-5 p-4 bg-primary-50 rounded-lg">
@@ -210,7 +208,7 @@ export default function Simulator() {
       {tab === 'severance' && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="card p-6 space-y-4">
-            <h3 className="font-bold text-slate-900">{t("Paramètres")}</h3>
+            <SectionTitle className="mb-1">{t("Paramètres")}</SectionTitle>
             <div>
               <label className="label">{t("Salaire brut mensuel (FCFA)")}</label>
               <input type="number" min="0" value={sevSalary === 0 ? '' : sevSalary} placeholder="0" onChange={e => setSevSalary(Number(e.target.value))} className="input" />
@@ -230,7 +228,7 @@ export default function Simulator() {
           </div>
 
           <div className="card p-6 space-y-5">
-            <h3 className="font-bold text-slate-900">{t("Résultat")}</h3>
+            <SectionTitle className="mb-1">{t("Résultat")}</SectionTitle>
 
             <div className="space-y-3">
               {sevYears >= 1 && (
@@ -267,7 +265,7 @@ export default function Simulator() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {[{ label: t('Profil A'), form, setF: f, color: 'text-primary-700' }, { label: t('Profil B'), form: formB, setF: fB, color: 'text-accent-700' }].map(({ label, form: fm, setF, color }, idx) => (
               <div key={label} className="card p-6">
-                <h3 className={`font-semibold mb-4 ${color}`}>{label}</h3>
+                <h3 className={`text-sm font-semibold mb-4 pb-2 border-b border-slate-200 ${color}`}>{label}</h3>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="label">{t("Situation")}</label>
@@ -335,9 +333,8 @@ export default function Simulator() {
 
 function Row({ l, v, neg, muted, bold }: { l: string; v: number; neg?: boolean; muted?: boolean; bold?: boolean }) {
   return (
-    <div className={`flex justify-between py-1 ${bold ? 'font-bold' : ''}`}>
-      <span className={muted ? 'text-slate-400' : 'text-slate-600'}>{l}</span>
-      <span className={`tabular-nums ${neg ? 'text-red-600' : 'text-slate-900'}`}>{neg ? '− ' : ''}{formatXOF(Math.abs(v))}</span>
-    </div>
+    <LeaderRow label={l} muted={muted} bold={bold} className="text-sm">
+      <span className={neg ? 'text-red-600' : ''}>{neg ? '− ' : ''}{formatXOF(Math.abs(v))}</span>
+    </LeaderRow>
   )
 }

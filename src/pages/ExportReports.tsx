@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react'
 import { apiFetch } from '../lib/api'
 import { calculatePayroll } from '../lib/payroll'
 import { generateBulletinPDF, pdfToImagePng } from '../lib/pdf'
-import { FileSpreadsheet, FileText, Image, Loader2, ChevronDown } from 'lucide-react'
+import { FileSpreadsheet, FileText, Image, Loader2 } from 'lucide-react'
+import { SectionTitle } from '../components/SectionTitle'
 import { t, monthName } from '../lib/i18n'
 
 interface Client   { id: string; name: string }
@@ -297,7 +298,7 @@ export default function ExportReports() {
       {tab==='bulletin' && (
         <div className="bg-white rounded-lg shadow p-6 space-y-5">
           <div>
-            <h2 className="font-semibold text-slate-800">{t("Bulletin de paie")}</h2>
+            <SectionTitle index={1} className="mb-1">{t("Bulletin de paie")}</SectionTitle>
             <p className="text-xs text-slate-500 mt-0.5">{t("Format DVV — identique à votre référence")}</p>
           </div>
 
@@ -358,7 +359,7 @@ export default function ExportReports() {
       {tab==='etat' && (
         <div className="bg-white rounded-lg shadow p-6 space-y-5">
           <div>
-            <h2 className="font-semibold text-slate-800">{t("État des charges")}</h2>
+            <SectionTitle index={2} className="mb-1">{t("État des charges")}</SectionTitle>
             <p className="text-xs text-slate-500 mt-0.5">{t("Format bancaire multi-colonnes")}</p>
           </div>
 
@@ -392,7 +393,7 @@ export default function ExportReports() {
       {tab==='solde' && (
         <div className="bg-white rounded-lg shadow p-6 space-y-4">
           <div>
-            <h2 className="font-semibold text-slate-800">{t("Solde de tout compte")}</h2>
+            <SectionTitle index={3} className="mb-1">{t("Solde de tout compte")}</SectionTitle>
             <p className="text-xs text-slate-500 mt-0.5">{t("Document contractuel de fin de contrat")}</p>
           </div>
 

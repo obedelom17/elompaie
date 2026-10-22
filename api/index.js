@@ -17,6 +17,15 @@ import ExcelJS from 'exceljs'
 const NEON_AUTH_BASE_URL = process.env.NEON_AUTH_BASE_URL
 const DB_URL = () => process.env.DATABASE_URL || process.env.POSTGRES_PRISMA_URL
 
+// Colonnes autorisées en écriture. Les noms de colonnes ne viennent jamais du client.
+const VARIABLE_COLUMNS = ['base_salary','sursalaire','indemnite_grossesse','indemnite_fonction','indemnite_communication','indemnite_logement','indemnite_repas','indemnite_transport','indemnite_anciennete','avance_salaire','remboursement_pret','deduction_forfaitaire','heures_sup_25','heures_sup_50','heures_sup_100','bulletin_url']
+const PERIOD_COLUMNS = ['status','closed_at']
+const pick = (obj, allowed) => Object.fromEntries(Object.entries(obj || {}).filter(([k]) => allowed.includes(k)))
+
+// Contrôles d'appartenance : une ressource doit appartenir à l'organisation de l'utilisateur.
+const ownsClient = async (sql, clientId, orgId) => !!clientId && (await sql('SELECT 1 FROM clients WHERE id=$1 AND organization_id=$2',[clientId,orgId])).rows.length > 0
+const ownsPeriod = async (sql, periodId, orgId) => !!periodId && (await sql('SELECT 1 FROM payroll_periods pp JOIN clients c ON pp.client_id=c.id WHERE pp.id=$1 AND c.organization_id=$2',[periodId,orgId])).rows.length > 0
+
 // Colonnes d'ancienneté : créées automatiquement au premier enregistrement,
 // pour qu'aucune migration manuelle ne soit nécessaire après le déploiement.
 let seniorityColumnsReady = null
@@ -974,7 +983,7 @@ export default async function handler(req, res) {
         JOIN employees e  ON e.id  = pv.employee_id
         JOIN payroll_periods pp ON pp.id = pv.period_id
         JOIN clients c    ON c.id  = pp.client_id
-        WHERE pv.period_id=${period_id} AND pv.employee_id=${employee_id}
+        WHERE pv.period_id=${period_id} AND pv.employee_id=${employee_id} AND c.organization_id=${auth.orgId}
       `
       if (!rows.length) return res.status(404).json({ error: 'Variables de paie introuvables. Enregistrez d\'abord les variables dans la période de paie.' })
       const v = rows[0]
@@ -1086,7 +1095,7 @@ export default async function handler(req, res) {
 
     if (path === '/api/export-etat-charges') {
       if (method !== 'POST') return res.status(405).end()
-      await requireAuth(req)
+      const auth = await requireAuth(req)
       const { period_id, avec_regularisation } = req.body
       const db = neon(DB_URL())
       const rows = await db`
@@ -1097,7 +1106,7 @@ export default async function handler(req, res) {
         JOIN employees e ON e.id = pv.employee_id
         JOIN payroll_periods pp ON pp.id = pv.period_id
         JOIN clients c ON c.id = pp.client_id
-        WHERE pv.period_id = ${period_id}
+        WHERE pv.period_id = ${period_id} AND c.organization_id = ${auth.orgId}
         ORDER BY e.last_name
       `
       if (!rows.length) return res.status(404).json({ error: 'Aucune variable de paie pour cette période. Saisissez et enregistrez les variables dans Périodes de paie d\'abord.' })
@@ -1167,13 +1176,13 @@ export default async function handler(req, res) {
 
     if (path === '/api/export-solde') {
       if (method !== 'POST') return res.status(405).end()
-      await requireAuth(req)
+      const auth = await requireAuth(req)
       const { employee_id, period_id, date_depart, date_fin_contrat,
               jours_conges_list, taux_conges_auto, taux_conges_manuel,
               avance, preavis, inclure_preavis, retenues_arrierees, regularisation_irpp,
               retenue_sur_solde } = req.body
       const db = neon(DB_URL())
-      const [emp] = await db`SELECT e.*, c.name as client_name FROM employees e JOIN clients c ON c.id=e.client_id WHERE e.id=${employee_id}`
+      const [emp] = await db`SELECT e.*, c.name as client_name FROM employees e JOIN clients c ON c.id=e.client_id WHERE e.id=${employee_id} AND c.organization_id=${auth.orgId}`
       if (!emp) return res.status(404).json({ error: 'Employé introuvable' })
       let vars = null
       if (period_id) {
@@ -1348,11 +1357,12 @@ export default async function handler(req, res) {
         if (method === 'GET')    { const r=await sql(`SELECT e.*,c.name as client_name FROM employees e JOIN clients c ON e.client_id=c.id WHERE e.id=$1 AND c.organization_id=$2`,[id,auth.orgId]); return res.status(r.rows.length?200:404).json(r.rows[0]||{error:'Introuvable'}) }
         if (method === 'PUT' || method === 'PATCH') {
           const b=req.body
-          const r=await sql(`UPDATE employees SET client_id=$1,matricule=$2,first_name=$3,last_name=$4,gender=$5,birth_date=$6,hire_date=$7,position=$8,category=$9,marital_status=$10,children_count=$11,social_security_number=$12,phone=$13,email=$14,active=$15,status=$16,contract_type=$17,contract_end_date=$18,pole=$19,responsable=$20,updated_at=NOW() WHERE id=$21 RETURNING *`,
-            [b.client_id,b.matricule||null,b.first_name,b.last_name,b.gender||'M',b.birth_date||null,b.hire_date||null,b.position||null,b.category||null,b.marital_status,b.children_count||0,b.social_security_number||null,b.phone||null,b.email||null,b.active!==false,b.status||'actif',b.contract_type||'cdi',b.contract_end_date||null,b.pole||null,b.responsable||null,id])
+          if (!(await ownsClient(sql, b.client_id, auth.orgId))) return res.status(403).json({ error:'Accès refusé' })
+          const r=await sql(`UPDATE employees SET client_id=$1,matricule=$2,first_name=$3,last_name=$4,gender=$5,birth_date=$6,hire_date=$7,position=$8,category=$9,marital_status=$10,children_count=$11,social_security_number=$12,phone=$13,email=$14,active=$15,status=$16,contract_type=$17,contract_end_date=$18,pole=$19,responsable=$20,updated_at=NOW() WHERE id=$21 AND client_id IN (SELECT id FROM clients WHERE organization_id=$22) RETURNING *`,
+            [b.client_id,b.matricule||null,b.first_name,b.last_name,b.gender||'M',b.birth_date||null,b.hire_date||null,b.position||null,b.category||null,b.marital_status,b.children_count||0,b.social_security_number||null,b.phone||null,b.email||null,b.active!==false,b.status||'actif',b.contract_type||'cdi',b.contract_end_date||null,b.pole||null,b.responsable||null,id,auth.orgId])
           return res.status(200).json(r.rows[0])
         }
-        if (method === 'DELETE') { await sql('DELETE FROM employees WHERE id=$1',[id]); return res.status(200).json({ok:true}) }
+        if (method === 'DELETE') { await sql('DELETE FROM employees WHERE id=$1 AND client_id IN (SELECT id FROM clients WHERE organization_id=$2)',[id,auth.orgId]); return res.status(200).json({ok:true}) }
       } else {
         if (method === 'GET')  {
           let q=`SELECT e.*,c.name as client_name FROM employees e JOIN clients c ON e.client_id=c.id WHERE c.organization_id=$1`
@@ -1363,6 +1373,7 @@ export default async function handler(req, res) {
         }
         if (method === 'POST') {
           const b=req.body
+          if (!(await ownsClient(sql, b.client_id, auth.orgId))) return res.status(403).json({ error:'Accès refusé' })
           const r=await sql(`INSERT INTO employees (client_id,matricule,first_name,last_name,gender,birth_date,hire_date,position,category,marital_status,children_count,social_security_number,phone,email,active,status,contract_type,contract_end_date,pole,responsable) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20) RETURNING *`,
             [b.client_id,b.matricule||null,b.first_name,b.last_name,b.gender||'M',b.birth_date||null,b.hire_date||null,b.position||null,b.category||null,b.marital_status||'celibataire',b.children_count||0,b.social_security_number||null,b.phone||null,b.email||null,b.active!==false,b.status||'actif',b.contract_type||'cdi',b.contract_end_date||null,b.pole||null,b.responsable||null])
           return res.status(201).json(r.rows[0])
@@ -1379,10 +1390,11 @@ export default async function handler(req, res) {
           return res.status(r.rows.length?200:404).json(r.rows[0]||{error:'Introuvable'})
         }
         if (method === 'PATCH') {
-          const b=req.body; const keys=Object.keys(b)
+          const b=pick(req.body, PERIOD_COLUMNS); const keys=Object.keys(b)
+          if (!keys.length) return res.status(400).json({ error:'Aucune donnée à modifier' })
+          if (!(await ownsPeriod(sql, id, auth.orgId))) return res.status(403).json({ error:'Accès refusé' })
           const sets=keys.map((k,i)=>`${k}=$${i+1}`).join(', ')
-          const vals=[...Object.values(b),id]
-          const r=await sql(`UPDATE payroll_periods SET ${sets},updated_at=NOW() WHERE id=$${vals.length} RETURNING *`,vals)
+          const r=await sql(`UPDATE payroll_periods SET ${sets},updated_at=NOW() WHERE id=$${keys.length+1} RETURNING *`,[...Object.values(b),id])
           return res.status(200).json(r.rows[0])
         }
       } else {
@@ -1395,6 +1407,7 @@ export default async function handler(req, res) {
         }
         if (method === 'POST') {
           const { client_id, period_month, period_year } = req.body
+          if (!(await ownsClient(sql, client_id, auth.orgId))) return res.status(403).json({ error:'Accès refusé' })
           const ex=await sql('SELECT id FROM payroll_periods WHERE client_id=$1 AND period_year=$2 AND period_month=$3',[client_id,period_year,period_month])
           if (ex.rows.length) return res.status(409).json({ error:'Période déjà existante' })
           const r=await sql('INSERT INTO payroll_periods (client_id,period_month,period_year,status) VALUES ($1,$2,$3,$4) RETURNING *',[client_id,period_month,period_year,'open'])
@@ -1407,24 +1420,27 @@ export default async function handler(req, res) {
     if (path === '/api/payroll-variables') {
       const { period_id, employee_id } = qp
       if (method === 'GET') {
-        let q=`SELECT pv.*,e.first_name,e.last_name,e.matricule,e.position,e.category,e.marital_status,e.children_count FROM payroll_variables pv JOIN employees e ON pv.employee_id=e.id WHERE pv.period_id=$1`
-        const p=[period_id]
-        if (employee_id) { q+=' AND pv.employee_id=$2'; p.push(employee_id) }
+        let q=`SELECT pv.*,e.first_name,e.last_name,e.matricule,e.position,e.category,e.marital_status,e.children_count FROM payroll_variables pv JOIN employees e ON pv.employee_id=e.id JOIN payroll_periods pp ON pv.period_id=pp.id JOIN clients c ON pp.client_id=c.id WHERE pv.period_id=$1 AND c.organization_id=$2`
+        const p=[period_id,auth.orgId]
+        if (employee_id) { q+=' AND pv.employee_id=$3'; p.push(employee_id) }
         const r=await sql(q,p); return res.status(200).json(r.rows)
       }
       if (method === 'POST' || method === 'PUT') {
         await ensureSeniorityColumns()
-        const b=req.body
+        const b=req.body || {}
+        if (!(await ownsPeriod(sql, b.period_id, auth.orgId))) return res.status(403).json({ error:'Accès refusé' })
+        const emp=await sql('SELECT 1 FROM employees e JOIN payroll_periods pp ON pp.client_id=e.client_id WHERE e.id=$1 AND pp.id=$2',[b.employee_id,b.period_id])
+        if (!emp.rows.length) return res.status(403).json({ error:'Accès refusé' })
+        const values=pick(b, VARIABLE_COLUMNS); const keys=Object.keys(values)
         const ex=await sql('SELECT id FROM payroll_variables WHERE period_id=$1 AND employee_id=$2',[b.period_id,b.employee_id])
         let r
         if (ex.rows.length) {
-          const { period_id:_p, employee_id:_e, ...rest } = b
-          const keys=Object.keys(rest)
+          if (!keys.length) return res.status(200).json(ex.rows[0])
           const sets=keys.map((k,i)=>`${k}=$${i+1}`).join(', ')
-          r=await sql(`UPDATE payroll_variables SET ${sets},updated_at=NOW() WHERE id=$${keys.length+1} RETURNING *`,[...Object.values(rest),ex.rows[0].id])
+          r=await sql(`UPDATE payroll_variables SET ${sets},updated_at=NOW() WHERE id=$${keys.length+1} RETURNING *`,[...Object.values(values),ex.rows[0].id])
         } else {
-          const keys=Object.keys(b)
-          r=await sql(`INSERT INTO payroll_variables (${keys.join(',')}) VALUES (${keys.map((_,i)=>`$${i+1}`).join(',')}) RETURNING *`,Object.values(b))
+          const cols=['period_id','employee_id',...keys]
+          r=await sql(`INSERT INTO payroll_variables (${cols.join(',')}) VALUES (${cols.map((_,i)=>`$${i+1}`).join(',')}) RETURNING *`,[b.period_id,b.employee_id,...Object.values(values)])
         }
         return res.status(200).json(r.rows[0])
       }
@@ -1434,11 +1450,11 @@ export default async function handler(req, res) {
     if (path === '/api/salary-grids') {
       const { id } = qp
       if (id) {
-        if (method === 'PUT')    { const b=req.body; const r=await sql('UPDATE salary_grids SET category=$1,echelon=$2,base_salary=$3,hourly_rate=$4 WHERE id=$5 RETURNING *',[b.category,b.echelon,b.base_salary,b.hourly_rate,id]); return res.status(200).json(r.rows[0]) }
-        if (method === 'DELETE') { await sql('DELETE FROM salary_grids WHERE id=$1',[id]); return res.status(200).json({ok:true}) }
+        if (method === 'PUT')    { const b=req.body; const r=await sql('UPDATE salary_grids SET category=$1,echelon=$2,base_salary=$3,hourly_rate=$4 WHERE id=$5 AND client_id IN (SELECT id FROM clients WHERE organization_id=$6) RETURNING *',[b.category,b.echelon,b.base_salary,b.hourly_rate,id,auth.orgId]); return res.status(r.rows.length?200:404).json(r.rows[0]||{error:'Introuvable'}) }
+        if (method === 'DELETE') { await sql('DELETE FROM salary_grids WHERE id=$1 AND client_id IN (SELECT id FROM clients WHERE organization_id=$2)',[id,auth.orgId]); return res.status(200).json({ok:true}) }
       } else {
         if (method === 'GET')  { const r=await sql(`SELECT sg.*,c.name as client_name FROM salary_grids sg JOIN clients c ON sg.client_id=c.id WHERE c.organization_id=$1 ORDER BY sg.category,sg.echelon`,[auth.orgId]); return res.status(200).json(r.rows) }
-        if (method === 'POST') { const b=req.body; const r=await sql('INSERT INTO salary_grids (client_id,category,echelon,base_salary,hourly_rate) VALUES ($1,$2,$3,$4,$5) RETURNING *',[b.client_id,b.category,b.echelon||1,b.base_salary||0,b.hourly_rate||0]); return res.status(201).json(r.rows[0]) }
+        if (method === 'POST') { const b=req.body; if (!(await ownsClient(sql, b.client_id, auth.orgId))) return res.status(403).json({ error:'Accès refusé' }); const r=await sql('INSERT INTO salary_grids (client_id,category,echelon,base_salary,hourly_rate) VALUES ($1,$2,$3,$4,$5) RETURNING *',[b.client_id,b.category,b.echelon||1,b.base_salary||0,b.hourly_rate||0]); return res.status(201).json(r.rows[0]) }
       }
     }
 
@@ -1481,6 +1497,7 @@ export default async function handler(req, res) {
 
     if (path === '/api/upload-logo') {
       if (method !== 'POST') return res.status(405).end()
+      await requireAuth(req)
       let buffer
       if (req.body && Buffer.isBuffer(req.body)) {
         buffer = req.body
@@ -1492,8 +1509,11 @@ export default async function handler(req, res) {
         for await (const chunk of req) chunks.push(chunk)
         buffer = Buffer.concat(chunks)
       }
-      const contentType = req.headers['x-content-type'] || 'image/png'
-      const filename    = req.headers['x-filename']     || `logo-${Date.now()}.png`
+      const ALLOWED_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml', 'application/pdf']
+      const contentType = ALLOWED_TYPES.includes(req.headers['x-content-type']) ? req.headers['x-content-type'] : null
+      if (!contentType) return res.status(400).json({ error: 'Format de fichier non pris en charge' })
+      if (buffer.length > 5 * 1024 * 1024) return res.status(413).json({ error: 'Fichier trop volumineux (5 Mo maximum)' })
+      const filename    = `logo-${Date.now()}-${(req.headers['x-filename'] || 'logo').toString().replace(/[^a-zA-Z0-9._-]/g, '_').slice(-60)}`
       const blob = await put(`logos/${filename}`, buffer, { access:'public', contentType, token:process.env.BLOB_READ_WRITE_TOKEN })
       return res.status(200).json({ url: blob.url })
     }

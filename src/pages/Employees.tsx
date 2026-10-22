@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { employeesApi, clientsApi, salaryGridsApi } from '../lib/api'
-import { useAuth } from '../context/AuthContext'
+import { employeesApi, clientsApi } from '../lib/api'
 import { Loader2, Plus, Search, Edit2, Trash2, User, X } from 'lucide-react'
 import { t, locale } from '../lib/i18n'
 
@@ -21,7 +20,6 @@ const defaultForm = {
 }
 
 export default function Employees() {
-  const { org } = useAuth()
   const navigate = useNavigate()
   const [employees, setEmployees] = useState<any[]>([])
   const [clients, setClients] = useState<any[]>([])

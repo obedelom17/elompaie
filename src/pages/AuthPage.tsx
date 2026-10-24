@@ -55,8 +55,8 @@ export default function AuthPage() {
   return (
     <div className="min-h-screen flex bg-white">
       <aside className="relative hidden lg:flex lg:w-[44%] flex-col justify-between bg-primary-800 text-white p-12 overflow-hidden">
-        <img src="/auth-bg.jpg" alt="" aria-hidden className="absolute inset-0 w-full h-full object-cover object-[35%_center] opacity-25 mix-blend-luminosity" />
-        <div className="absolute inset-0 bg-primary-800/70" aria-hidden />
+        <img src="/auth-bg.jpg" alt="" aria-hidden className="absolute inset-0 w-full h-full object-cover object-[35%_center] opacity-55 mix-blend-luminosity" />
+        <div className="absolute inset-0 bg-primary-800/40" aria-hidden />
         <div className="relative"><Logo size={32} light /></div>
         <div className="relative">
           <h2 className="text-3xl font-semibold leading-tight tracking-tight max-w-md">

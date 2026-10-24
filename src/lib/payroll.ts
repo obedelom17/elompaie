@@ -2,6 +2,10 @@ import { getLang } from './i18n'
 const getLocale = () => (getLang() === 'en' ? 'en-US' : 'fr-FR')
 // Moteur de calcul de paie - Togo
 
+// Indemnité créée par l'utilisateur. Si cotisable est faux, elle s'ajoute au brut
+// sans entrer dans la base CNSS, AMU et IRPP.
+export interface CustomAllowance { label: string; amount: number; cotisable?: boolean }
+
 export interface PayrollInput {
   base_salary: number
   overtime_hours?: number
@@ -12,6 +16,7 @@ export interface PayrollInput {
   housing_premium: number
   meal_premium: number
   transport_allowance: number
+  custom_allowances?: CustomAllowance[]   // Indemnités personnalisées
   seniority_allowance?: number   // Indemnité d'ancienneté (soumise CNSS/AMU/IRPP)
   thirteenth_month?: number      // 13ème mois
   exceptional_bonus?: number     // prime exceptionnelle
@@ -68,7 +73,7 @@ const ITS_BRACKETS = [
 
 // RICF Togo (CGI art. 82) : 10 000 F/enfant à charge (max 6 enfants)
 // Le conjoint n'est PAS inclus dans le RICF mensuel
-export function getPersonnesACharge(maritalStatus: string, childrenCount: number): number {
+export function getPersonnesACharge(_maritalStatus: string, childrenCount: number): number {
   return Math.min(childrenCount, 6)
 }
 
@@ -118,7 +123,12 @@ export function calculatePayroll(input: PayrollInput): PayrollResult {
   // Indemnité enceinte : exonérée CNSS, AMU et IRPP (CGT Togo art. 146)
   const indemnite_grossesse = input.indemnite_grossesse || 0
 
+  const customList = (input.custom_allowances || []).filter(a => Number(a.amount) > 0)
+  const customCotisable = customList.filter(a => a.cotisable !== false).reduce((sum, a) => sum + Number(a.amount), 0)
+  const customExonere   = customList.filter(a => a.cotisable === false).reduce((sum, a) => sum + Number(a.amount), 0)
+
   const gross_salary_cotisable =
+    customCotisable +
     (input.base_salary        || 0) +
     overtime_amount +
     (input.overtime_premium   || 0) +
@@ -131,7 +141,7 @@ export function calculatePayroll(input: PayrollInput): PayrollResult {
     (input.thirteenth_month   || 0) +
     (input.exceptional_bonus  || 0)
 
-  const gross_salary = gross_salary_cotisable + indemnite_grossesse
+  const gross_salary = gross_salary_cotisable + indemnite_grossesse + customExonere
 
   const cnss_employee = Math.round(gross_salary_cotisable * CNSS_EMPLOYEE_RATE)
   const amu_employee = Math.round(gross_salary_cotisable * AMU_EMPLOYEE_RATE)

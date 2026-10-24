@@ -4,6 +4,7 @@ import { calculatePayroll } from '../lib/payroll'
 import { generateBulletinPDF, pdfToImagePng } from '../lib/pdf'
 import { FileSpreadsheet, FileText, Image, Loader2 } from 'lucide-react'
 import { SectionTitle } from '../components/SectionTitle'
+import { pdfNum, pdfXOF } from '../lib/format'
 import { t, monthName } from '../lib/i18n'
 
 interface Client   { id: string; name: string }
@@ -151,6 +152,9 @@ export default function ExportReports() {
       marital_status:            emp.marital_status  || vars.marital_status  || 'celibataire',
       children_count:            Number(emp.children_count ?? vars.children_count)            || 0,
       indemnite_grossesse:       Number(vars.indemnite_grossesse) || 0,
+      custom_allowances:         (Array.isArray(vars.indemnites_perso) ? vars.indemnites_perso : [])
+        .map((a: any) => ({ label: String(a.label || ''), amount: Number(a.amount) || 0, cotisable: a.cotisable !== false }))
+        .filter((a: any) => a.label && a.amount > 0),
     }
     // Stocker anciennete séparément pour l'affichage dans le bulletin
     const ancienneteVal = anciennete
@@ -241,16 +245,24 @@ export default function ExportReports() {
         ? ['N°','Nom et Prénoms','Responsable','Poste','Pole','Brut','Brut imposable','CNSS Sal 4%','AMU Sal 5%','CNSS Pat 17,5%','AMU Pat 5%','IRPP','Régul IRPP','IRPP à payer','Total Ret.','Net à payer']
         : ['N°','Nom et Prénoms','Responsable','Poste','Pole','Brut','Brut imposable','CNSS Sal 4%','AMU Sal 5%','CNSS Pat 17,5%','AMU Pat 5%','IRPP','Total Ret.','Net à payer']
 
+      const numericFrom = 5
+      const totals = headers.map((_, ci) => ci === 1 ? 'TOTAL' : ci >= numericFrom ? pdfNum((rows as any[][]).reduce((sum, r) => sum + (Number(r[ci]) || 0), 0)) : '')
+      const body = (rows as any[][]).map(r => r.map((v, ci) => ci >= numericFrom ? pdfNum(v) : String(v ?? '')))
+      const numStyles: Record<number, any> = {}
+      for (let ci = numericFrom; ci < headers.length; ci++) numStyles[ci] = { halign: 'right' }
+
       autoTable(doc, {
         startY: 20,
         head: [headers],
-        body: rows,
-        theme: 'striped',
-        headStyles: { fillColor: [217,225,242], textColor:[0,0,0], fontSize:7, fontStyle:'bold', halign:'center' },
-        bodyStyles: { fontSize:7 },
-        columnStyles: { 0:{halign:'center',cellWidth:8}, 1:{cellWidth:40} },
-        foot: [rows.length > 0 ? ['','TOTAL','','','', ...Array(headers.length-5).fill('')] : []],
+        body,
+        foot: rows.length > 0 ? [totals] : undefined,
         showFoot: 'lastPage',
+        theme: 'grid',
+        styles: { fontSize: 7, cellPadding: 1.6, lineColor: [200, 200, 200], lineWidth: 0.1, valign: 'middle' },
+        headStyles: { fillColor: [217,225,242], textColor: [0,0,0], fontSize: 7, fontStyle: 'bold', halign: 'center' },
+        footStyles: { fillColor: [217,225,242], textColor: [0,0,0], fontStyle: 'bold', halign: 'right' },
+        alternateRowStyles: { fillColor: [245, 247, 250] },
+        columnStyles: { 0: { halign: 'center', cellWidth: 8 }, 1: { cellWidth: 42 }, ...numStyles },
       })
       doc.setFontSize(7); doc.setFont('helvetica','italic')
       doc.text(`Édité le ${new Date().toLocaleDateString('fr-FR')} · ElomPaie · CGI OTR 2025`,
@@ -514,7 +526,7 @@ export default function ExportReports() {
               y += 4
 
               // Tableau des lignes
-              const rows = (data.lignes || []).map((l: any) => [l.label, l.base||'', l.taux||'', l.montant!=null?l.montant.toLocaleString('fr-FR'):''])
+              const rows = (data.lignes || []).map((l: any) => [l.label, l.base?pdfNum(l.base):'', l.taux||'', l.montant!=null?pdfNum(l.montant):''])
               const { default: autoTable } = await import('jspdf-autotable')
               autoTable(doc, {
                 startY: y,
@@ -529,7 +541,7 @@ export default function ExportReports() {
               doc.setFont('helvetica','bold'); doc.setFontSize(11)
               doc.setFillColor(217,225,242); doc.rect(ML, y, TW, 10, 'F')
               doc.text('NET A PAYER', W/2-20, y+7)
-              doc.text(data.net_payer!=null ? data.net_payer.toLocaleString('fr-FR')+' F' : '', MR-2, y+7, {align:'right'})
+              doc.text(data.net_payer!=null ? pdfXOF(data.net_payer) : '', MR-2, y+7, {align:'right'})
               doc.setFontSize(7); doc.setFont('helvetica','italic'); doc.setTextColor(140,140,140)
               doc.text(`Édité le ${new Date().toLocaleDateString('fr-FR')} · ElomPaie`, W/2, 287, {align:'center'})
 

@@ -263,7 +263,7 @@ export default function Simulator() {
       {tab === 'compare' && (
         <div className="space-y-5">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {[{ label: t('Profil A'), form, setF: f, color: 'text-primary-700' }, { label: t('Profil B'), form: formB, setF: fB, color: 'text-accent-700' }].map(({ label, form: fm, setF, color }, idx) => (
+            {[{ label: t('Profil A'), form, setF: f, color: 'text-primary-700' }, { label: t('Profil B'), form: formB, setF: fB, color: 'text-accent-700' }].map(({ label, form: fm, setF, color }) => (
               <div key={label} className="card p-6">
                 <h3 className={`text-sm font-semibold mb-4 pb-2 border-b border-slate-200 ${color}`}>{label}</h3>
                 <div className="grid grid-cols-2 gap-3">

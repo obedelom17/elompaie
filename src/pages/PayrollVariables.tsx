@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { payrollApi, employeesApi } from '../lib/api'
-import { calculatePayroll, formatXOF, PayrollResult } from '../lib/payroll'
-import { ArrowLeft, Calculator, Save, Lock, Loader2, Search, Info, Download } from 'lucide-react'
+import { calculatePayroll, formatXOF, PayrollResult, CustomAllowance } from '../lib/payroll'
+import { ArrowLeft, Calculator, Save, Lock, Loader2, Search, Info, Download, Plus, Trash2 } from 'lucide-react'
 import { t, monthName } from '../lib/i18n'
 
 interface Employee { id: string; first_name: string; last_name: string; matricule: string|null; position: string|null; category: string|null; marital_status: string; children_count: number; client_id: string; email: string|null; phone: string|null; social_security_number: string|null; hire_date: string|null; client_name?: string }
 
-const EMPTY_VARS = { base_salary: 0, seniority_allowance: 0, overtime_premium: 0, function_allowance: 0, communication_allowance: 0, housing_premium: 0, meal_premium: 0, transport_allowance: 0, salary_advance: 0, loan_payment: 0, flat_deduction: 0, indemnite_grossesse: 0 }
+const EMPTY_VARS = { base_salary: 0, seniority_allowance: 0, custom_allowances: [] as CustomAllowance[], overtime_premium: 0, function_allowance: 0, communication_allowance: 0, housing_premium: 0, meal_premium: 0, transport_allowance: 0, salary_advance: 0, loan_payment: 0, flat_deduction: 0, indemnite_grossesse: 0 }
 
 export default function PayrollVariables() {
   const { periodId } = useParams<{ periodId: string }>()
@@ -42,9 +42,30 @@ export default function PayrollVariables() {
     } catch {} finally { setLoading(false) }
   }
 
+  const parseCustom = (raw: any): CustomAllowance[] => {
+    let list = raw
+    if (typeof raw === 'string') { try { list = JSON.parse(raw) } catch { list = [] } }
+    return Array.isArray(list)
+      ? list.map((a: any) => ({ label: String(a.label ?? ''), amount: Number(a.amount) || 0, cotisable: a.cotisable !== false }))
+      : []
+  }
+
+  // Noms déjà utilisés dans cette période : proposés à la saisie
+  const knownCustomLabels = Array.from(new Set(
+    Array.from(variables.values()).flatMap((row: any) => parseCustom(row.indemnites_perso).map(a => a.label)).filter(Boolean)
+  ))
+
+  const updateCustom = (index: number, patch: Partial<CustomAllowance>) =>
+    setForm({ ...form, custom_allowances: form.custom_allowances.map((a, i) => i === index ? { ...a, ...patch } : a) })
+  const addCustom = () =>
+    setForm({ ...form, custom_allowances: [...form.custom_allowances, { label: '', amount: 0, cotisable: true }] })
+  const removeCustom = (index: number) =>
+    setForm({ ...form, custom_allowances: form.custom_allowances.filter((_, i) => i !== index) })
+
   const formFromRow = (row: any) => ({
     base_salary:             Number(row.base_salary)            || 0,
     seniority_allowance:     Number(row.indemnite_anciennete)   || 0,
+    custom_allowances:       parseCustom(row.indemnites_perso),
     overtime_premium:        Number(row.sursalaire)             || 0,
     function_allowance:      Number(row.indemnite_fonction)     || 0,
     communication_allowance: Number(row.indemnite_communication)|| 0,
@@ -98,6 +119,7 @@ export default function PayrollVariables() {
       indemnite_repas: form.meal_premium || 0,
       indemnite_transport: form.transport_allowance || 0,
       indemnite_anciennete: form.seniority_allowance || 0,
+      indemnites_perso: form.custom_allowances.filter(a => a.label.trim() && a.amount > 0),
       avance_salaire: form.salary_advance || 0,
       remboursement_pret: form.loan_payment || 0,
       deduction_forfaitaire: form.flat_deduction || 0,
@@ -240,6 +262,51 @@ export default function PayrollVariables() {
                       </div>
                     </section>
                   ))}
+                  <section>
+                    <div className="flex items-center gap-3 mb-3">
+                      <span className="text-xs font-semibold tabular-nums text-accent-600">04</span>
+                      <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-500">{t("Indemnités personnalisées")}</h4>
+                      <span className="flex-1 h-px bg-slate-200" />
+                    </div>
+                    <datalist id="custom-allowance-labels">
+                      {knownCustomLabels.map(l => <option key={l} value={l} />)}
+                    </datalist>
+                    {form.custom_allowances.length === 0 && (
+                      <p className="text-sm text-slate-500 mb-3">{t("Aucune indemnité personnalisée. Ajoutez celles propres à ce salarié.")}</p>
+                    )}
+                    <div className="space-y-3">
+                      {form.custom_allowances.map((a, i) => (
+                        <div key={i} className="grid grid-cols-1 sm:grid-cols-[1fr_180px_auto_auto] gap-3 items-end">
+                          <div>
+                            <label className="label">{t("Nom de l'indemnité")}</label>
+                            <input type="text" list="custom-allowance-labels" disabled={isClosed} value={a.label} maxLength={60}
+                              placeholder={t("Ex : Prime de risque")} onChange={e => updateCustom(i, { label: e.target.value })} className="input" />
+                          </div>
+                          <div>
+                            <label className="label">{t("Montant")}</label>
+                            <div className="relative">
+                              <input type="number" min="0" disabled={isClosed} value={a.amount === 0 ? '' : a.amount} placeholder="0"
+                                onChange={e => updateCustom(i, { amount: e.target.value === '' ? 0 : Number(e.target.value) })}
+                                onFocus={e => e.target.select()} className="input pr-9 text-right" />
+                              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 pointer-events-none">F</span>
+                            </div>
+                          </div>
+                          <label className="flex items-center gap-2 text-sm text-slate-600 h-10 cursor-pointer select-none">
+                            <input type="checkbox" disabled={isClosed} checked={a.cotisable !== false}
+                              onChange={e => updateCustom(i, { cotisable: e.target.checked })} className="h-4 w-4 rounded border-slate-300" />
+                            {t("Soumise aux cotisations")}
+                          </label>
+                          <button type="button" disabled={isClosed} onClick={() => removeCustom(i)} className="btn-ghost h-10" aria-label={t("Supprimer")}>
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                    <button type="button" disabled={isClosed || form.custom_allowances.length >= 20} onClick={addCustom} className="btn-secondary mt-3">
+                      <Plus className="w-4 h-4" />
+                      {t("Ajouter une indemnité")}
+                    </button>
+                  </section>
                 </div>
 
                 <div className="flex gap-3 mt-6">

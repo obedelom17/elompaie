@@ -473,6 +473,14 @@ const en: Record<string, string> = {
   'Indemnités et primes': 'Allowances and bonuses',
   'Retenues': 'Deductions',
 
+  'Indemnités personnalisées': 'Custom allowances',
+  'Aucune indemnité personnalisée. Ajoutez celles propres à ce salarié.': 'No custom allowances. Add those specific to this employee.',
+  "Nom de l'indemnité": 'Allowance name',
+  'Ex : Prime de risque': 'E.g. Hazard pay',
+  'Montant': 'Amount',
+  'Soumise aux cotisations': 'Subject to contributions',
+  'Ajouter une indemnité': 'Add an allowance',
+
   // Langue
   'Langue': 'Language',
   'Passer en anglais': 'Switch to English',

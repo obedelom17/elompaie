@@ -22,11 +22,7 @@ export default function EmployeeDetail() {
 
   const fetchData = async () => {
     try {
-      const [emp, vars] = await Promise.all([
-        employeesApi.get(id!),
-        // fetch variables for this employee via all periods (simplified)
-        Promise.resolve([]),
-      ])
+      const emp = await employeesApi.get(id!)
       setEmployee(emp)
       // Fetch payroll history through periods
       const periods = await payrollApi.listPeriods(emp.client_id)

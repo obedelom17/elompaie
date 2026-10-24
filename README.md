@@ -51,6 +51,16 @@ Dans l'écran de saisie des variables d'une période, l'indemnité d'ancienneté
 - Elle apparaît sur le bulletin sous la rubrique « Ancienneté ».
 - La colonne `indemnite_anciennete` est créée automatiquement par l'API au premier enregistrement. Le script `migrations/001_anciennete.sql` permet de la créer à la main si besoin.
 
+### Indemnités personnalisées
+
+Dans la saisie des variables d'une période, la section « Indemnités personnalisées » permet de créer des indemnités propres à chaque salarié : un nom, un montant et une case « Soumise aux cotisations ».
+
+- Une indemnité soumise aux cotisations entre dans la base CNSS, AMU et IRPP.
+- Une indemnité non soumise s'ajoute au brut sans entrer dans ces bases ; elle apparaît avec la mention « (exo.) ».
+- Chaque indemnité apparaît comme une ligne du bulletin (Excel, PDF, PNG) et dans l'état des charges.
+- Les noms déjà utilisés dans la période sont proposés à la saisie. Maximum de 20 indemnités par salarié.
+- Les données sont stockées dans la colonne `indemnites_perso` (créée automatiquement, ou via `migrations/002_indemnites_perso.sql`).
+
 ### Langues
 
 Tous les écrans existent en français et en anglais. Les textes sont déclarés dans `src/lib/locales/en.ts`, la clé étant le texte français. Pour ajouter une phrase, il suffit d'écrire `t("Texte en français")` dans le code puis d'ajouter sa traduction dans ce fichier. Les documents officiels (bulletins, états, bordereaux) restent rédigés en français.
@@ -156,6 +166,16 @@ On the payroll variables screen of a period, the seniority allowance is entered 
 - It is part of the contributory gross salary: it is included in the CNSS, AMU and income tax base.
 - It appears on the payslip under the "Ancienneté" line.
 - The `indemnite_anciennete` column is created automatically by the API on first save. The `migrations/001_anciennete.sql` script creates it by hand if needed.
+
+### Custom allowances
+
+On the payroll variables screen of a period, the "Custom allowances" section lets you create allowances specific to each employee: a name, an amount and a "Subject to contributions" checkbox.
+
+- An allowance subject to contributions is included in the CNSS, AMU and income tax base.
+- A non-contributory allowance is added to gross pay without entering those bases; it is marked "(exo.)".
+- Each allowance appears as a line on the payslip (Excel, PDF, PNG) and in the statement of charges.
+- Names already used in the period are suggested as you type. Up to 20 allowances per employee.
+- Data is stored in the `indemnites_perso` column (created automatically, or through `migrations/002_indemnites_perso.sql`).
 
 ### Languages
 

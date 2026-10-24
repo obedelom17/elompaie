@@ -10,7 +10,7 @@ export const config = {
 import { requireAuth } from './_auth.js'
 import { sql } from './_db.js'
 import { neon } from '@neondatabase/serverless'
-import { calcIrppMensuel, calcBrut, calcPersonnesCharge } from './_payroll.js'
+import { calcPayrollFromRow, normalizeRow, parseCustomAllowances, n } from './_payroll.js'
 import { put } from '@vercel/blob'
 import ExcelJS from 'exceljs'
 
@@ -18,7 +18,7 @@ const NEON_AUTH_BASE_URL = process.env.NEON_AUTH_BASE_URL
 const DB_URL = () => process.env.DATABASE_URL || process.env.POSTGRES_PRISMA_URL
 
 // Colonnes autorisées en écriture. Les noms de colonnes ne viennent jamais du client.
-const VARIABLE_COLUMNS = ['base_salary','sursalaire','indemnite_grossesse','indemnite_fonction','indemnite_communication','indemnite_logement','indemnite_repas','indemnite_transport','indemnite_anciennete','avance_salaire','remboursement_pret','deduction_forfaitaire','heures_sup_25','heures_sup_50','heures_sup_100','bulletin_url']
+const VARIABLE_COLUMNS = ['base_salary','sursalaire','indemnite_grossesse','indemnite_fonction','indemnite_communication','indemnite_logement','indemnite_repas','indemnite_transport','indemnite_anciennete','avance_salaire','remboursement_pret','deduction_forfaitaire','heures_sup_25','heures_sup_50','heures_sup_100','bulletin_url','indemnites_perso']
 const PERIOD_COLUMNS = ['status','closed_at']
 const pick = (obj, allowed) => Object.fromEntries(Object.entries(obj || {}).filter(([k]) => allowed.includes(k)))
 
@@ -34,6 +34,7 @@ function ensureSeniorityColumns() {
     seniorityColumnsReady = (async () => {
       const db = neon(DB_URL())
       await db`ALTER TABLE payroll_variables ADD COLUMN IF NOT EXISTS indemnite_anciennete NUMERIC DEFAULT 0`
+      await db`ALTER TABLE payroll_variables ADD COLUMN IF NOT EXISTS indemnites_perso JSONB DEFAULT '[]'::jsonb`
     })().catch(err => { seniorityColumnsReady = null; console.warn('[schema] anciennete:', err.message) })
   }
   return seniorityColumnsReady
@@ -188,13 +189,28 @@ function sc(ws, addr, val, font, align, border, numFmt) {
   if (numFmt) c.numFmt    = numFmt
 }
 
+// Dimensions d'une image PNG ou JPEG, lues dans l'en-tête du fichier.
+function imageSize(b) {
+  if (b[0] === 0x89 && b[1] === 0x50) return { type: 'png', width: b.readUInt32BE(16), height: b.readUInt32BE(20) }
+  if (b[0] === 0xFF && b[1] === 0xD8) {
+    let i = 2
+    while (i < b.length - 9) {
+      if (b[i] !== 0xFF) { i++; continue }
+      const marker = b[i + 1]
+      if (marker >= 0xC0 && marker <= 0xCF && ![0xC4, 0xC8, 0xCC].includes(marker)) return { type: 'jpeg', height: b.readUInt16BE(i + 5), width: b.readUInt16BE(i + 7) }
+      i += 2 + b.readUInt16BE(i + 2)
+    }
+  }
+  return null
+}
+
 // ─── BULLETIN DE PAIE (pixel-perfect DVV_2026.xlsx) ─────────────────────────
 function genBulletin(wb, sheetName, data) {
   const ws = wb.addWorksheet(sheetName)
 
   // Largeurs adaptées (ref x 1.5 pour colonnes données)
   ws.getColumn(1).width = 8.0      // Code
-  ws.getColumn(2).width = 28.0     // Rubriques — assez pour "Indemnité de communication"
+  ws.getColumn(2).width = 35.0     // Rubriques — assez pour "Indemnité de communication"
   ws.getColumn(3).width = 16.0     // Base — assez pour 2 000 000
   ws.getColumn(4).width = 10.0     // Taux/NB
   ws.getColumn(5).width = 14.0     // Retenues
@@ -204,7 +220,7 @@ function genBulletin(wb, sheetName, data) {
   ws.pageSetup.paperSize   = 9
   ws.pageSetup.fitToPage   = true
   ws.pageSetup.fitToWidth  = 1
-  ws.pageSetup.fitToHeight = 0
+  ws.pageSetup.fitToHeight = 1
 
   // numFmt identique à la ref: '#,##0 _F' pour montants, '#,##0.00 _F' pour taux
   const nf  = '#,##0 _F'
@@ -245,13 +261,15 @@ function genBulletin(wb, sheetName, data) {
     if (numFmt) c.numFmt    = numFmt
   }
 
-  // ── Logo (col A-B, rows 1-9) ──────────────────────────────────────────────
+  // ── Logo : proportions conservées, contenu dans un cadre de 170 x 120 px ──
   if (data.logoBuffer && data.logoBuffer.length > 4) {
     try {
-      const b = data.logoBuffer
-      const extension = (b[0]===0xFF && b[1]===0xD8) ? 'jpeg' : 'png'
-      const imgId = wb.addImage({ buffer: data.logoBuffer, extension })
-      ws.addImage(imgId, { tl:{col:0,row:0}, br:{col:2,row:9} })
+      const dim = imageSize(data.logoBuffer)
+      if (dim) {
+        const ratio  = Math.min(170 / dim.width, 120 / dim.height, 1)
+        const imgId  = wb.addImage({ buffer: data.logoBuffer, extension: dim.type })
+        ws.addImage(imgId, { tl: { col: 0.1, row: 0.4 }, ext: { width: Math.round(dim.width * ratio), height: Math.round(dim.height * ratio) } })
+      }
     } catch {}
   }
 
@@ -287,7 +305,7 @@ function genBulletin(wb, sheetName, data) {
 
   ws.mergeCells('C17:F17')
   ws.getCell('C17').fill = fillLight
-  ws.getRow(17).height   = 15.75
+  ws.getRow(17).height   = 32
 
   // ── Entité A11:B13 (logo zone) + Entité A17:B17 merged ───────────────────
   // Entité: ligne séparée en bas de la zone logo
@@ -308,7 +326,7 @@ function genBulletin(wb, sheetName, data) {
     `N° Employeur : ${data.num_employeur||''}    NIF : ${data.nif||''}`,
     { name:'Century Gothic', size:10, bold:true, color:{argb:'FFFFFFFF'} },
     aCM, null, fillBlue)
-  ws.getRow(17).height = 15.75
+  ws.getRow(17).height = 32
 
   // NB: on ajoute TEL en dessous de A17
   // La ref a: A17 = merged "N° Employeur..." en fond bleu
@@ -323,25 +341,27 @@ function genBulletin(wb, sheetName, data) {
   // Chaque ligne: A et B sans fusion — A right-aligned, B left-aligned
   // Border gauche double sur colonne A (comme la ref)
   const infos = [
-    { r:18, la:' Nom & Prénoms : ',   vb: data.nom            },
-    { r:19, la:'N°Assuré :',          vb: data.n_assure        },
-    { r:20, la:'NIF:',                vb: data.nif_employe      },
-    { r:21, la:'Direction/section:',  vb: data.direction        },
-    { r:22, la:'Poste/Fonction: ',    vb: data.poste            },
-    { r:23, la:'Téléphone:',          vb: data.telephone        },
-    { r:24, la:" Date d'embauche: ",  vb: data.date_embauche    },
-    { r:25, la:' Pers à charge ',     vb: data.personnes_charge },
+    { r:18, la:'Nom & Prénoms :',    vb: data.nom            },
+    { r:19, la:'N° Assuré :',        vb: data.n_assure        },
+    { r:20, la:'NIF :',              vb: data.nif_employe      },
+    { r:21, la:'Direction/section :', vb: data.direction        },
+    { r:22, la:'Poste/Fonction :',   vb: data.poste            },
+    { r:23, la:'Téléphone :',        vb: data.telephone        },
+    { r:24, la:"Date d'embauche :",  vb: data.date_embauche    },
+    { r:25, la:'Pers. à charge :',   vb: data.personnes_charge },
   ]
   for (const { r, la, vb } of infos) {
+    ws.mergeCells(`A${r}:B${r}`)
     ws.getCell(`A${r}`).value     = la
     ws.getCell(`A${r}`).font      = cg10b
-    ws.getCell(`A${r}`).alignment = aR
+    ws.getCell(`A${r}`).alignment = { horizontal:'left', vertical:'middle', indent:1 }
     ws.getCell(`A${r}`).border    = { left:dbl() }
-    ws.getCell(`B${r}`).value     = vb
-    ws.getCell(`B${r}`).font      = cg10
-    ws.getCell(`B${r}`).alignment = aL
+    ws.mergeCells(`C${r}:F${r}`)
+    ws.getCell(`C${r}`).value     = vb === null || vb === undefined ? '' : vb
+    ws.getCell(`C${r}`).font      = cg10
+    ws.getCell(`C${r}`).alignment = { horizontal:'left', vertical:'middle' }
+    ws.getRow(r).height = 15.75
   }
-  ws.getRow(25).height = 12.75
 
   // ── Header tableau row 26 ─────────────────────────────────────────────────
   const fillHeader = { type:'pattern', pattern:'solid', fgColor:{argb:'FFD9E1F2'} }
@@ -371,7 +391,7 @@ function genBulletin(wb, sheetName, data) {
     ws.getCell(`B${row}`).font      = cg10
     ws.getCell(`B${row}`).border    = { left:thin() }
     // C: Base
-    ws.getCell(`C${row}`).value     = rub.base != null ? rub.base : 0
+    ws.getCell(`C${row}`).value     = n(rub.base)
     ws.getCell(`C${row}`).numFmt    = nf
     ws.getCell(`C${row}`).border    = { left:thin() }
     ws.getCell(`C${row}`).font      = cg10
@@ -384,7 +404,7 @@ function genBulletin(wb, sheetName, data) {
     // E: vide
     ws.getCell(`E${row}`).border    = { left:thin() }
     // F: Gains = valeur directe (ExcelJS ne calcule pas les formules)
-    const gainVal = rub.base != null ? rub.base : 0
+    const gainVal = n(rub.base)
     ws.getCell(`F${row}`).value     = { formula:`C${row}`, result: gainVal }
     ws.getCell(`F${row}`).numFmt    = nf
     ws.getCell(`F${row}`).border    = { left:thin(), right:dbl() }
@@ -393,310 +413,299 @@ function genBulletin(wb, sheetName, data) {
     row++
   }
 
+  // ── Calculs : tous les montants sont des nombres, chaque formule porte son résultat ──
+  const brutTotal   = (data.rubriques||[]).reduce((sum, r) => sum + n(r.base), 0)
+  const brutCot     = data.brut_cotisable != null ? n(data.brut_cotisable) : brutTotal
+  const cnssVal     = Math.round(brutCot * 0.04)
+  const amuVal      = Math.round(brutCot * 0.05)
+  const irppVal     = n(data.irpp)
+  const totRetLegal = cnssVal + amuVal + irppVal
+  const netLegalVal = brutTotal - totRetLegal
+  const autres      = (data.autres_retenues || []).filter(r => n(r.montant) > 0)
+  const totAutres   = autres.reduce((sum, r) => sum + n(r.montant), 0)
+  const netPayVal   = netLegalVal - totAutres
+  const patronalVal = Math.round(brutCot * 0.175)
+  const amuPatVal   = amuVal
+  const masseVal    = brutTotal + patronalVal + amuPatVal
+
+  // Une ligne du tableau : bordures communes
+  const bordered = (r, extra = {}) => {
+    ws.getCell(`A${r}`).border = { left:dbl(), right:thin() }
+    for (const col of ['B','C','D','E']) ws.getCell(`${col}${r}`).border = { left:thin() }
+    ws.getCell(`F${r}`).border = { left:thin(), right:dbl() }
+  }
+  const put = (addr, value, font, numFmt, alignment) => {
+    const c = ws.getCell(addr)
+    c.value = value
+    if (font) c.font = font
+    if (numFmt) c.numFmt = numFmt
+    if (alignment) c.alignment = alignment
+  }
+
   // ── Salaire brut ─────────────────────────────────────────────────────────
   const brutRow = row
   const first   = gainsRows.length ? gainsRows[0] : row-1
   const last    = gainsRows.length ? gainsRows[gainsRows.length-1] : row-1
-  ws.getCell(`A${brutRow}`).border = { left:dbl(), right:thin() }
-  ws.getCell(`B${brutRow}`).value  = 'Salaire brut '
-  ws.getCell(`B${brutRow}`).font   = cg10b
-  ws.getCell(`B${brutRow}`).border = { left:thin() }
-  ws.getCell(`C${brutRow}`).border = { left:thin() }
-  ws.getCell(`D${brutRow}`).border = { left:thin() }
-  ws.getCell(`E${brutRow}`).border = { left:thin() }
-  const brutTotal = (data.rubriques||[]).reduce((s,r) => s + (r.base||0), 0)
-  ws.getCell(`F${brutRow}`).value  = { formula:`SUM(F${first}:F${last})`, result: brutTotal }
-  ws.getCell(`F${brutRow}`).numFmt = nf
-  ws.getCell(`F${brutRow}`).font   = cg10b
-  ws.getCell(`F${brutRow}`).border = { left:thin(), right:dbl() }
+  bordered(brutRow)
+  put(`B${brutRow}`, 'Salaire brut', cg10b)
+  put(`F${brutRow}`, gainsRows.length ? { formula:`SUM(F${first}:F${last})`, result: brutTotal } : 0, cg10b, nf)
   row++
 
   // ── CNSS ─────────────────────────────────────────────────────────────────
   const cnssRow = row
-  ws.getCell(`A${row}`).border = { left:dbl(), right:thin() }
-  ws.getCell(`B${row}`).value  = 'CNSS '; ws.getCell(`B${row}`).font = cg10; ws.getCell(`B${row}`).border = { left:thin() }
-  ws.getCell(`C${row}`).value  = { formula:`F${brutRow}` }; ws.getCell(`C${row}`).numFmt = nf; ws.getCell(`C${row}`).border = { left:thin() }; ws.getCell(`C${row}`).font = cg10
-  ws.getCell(`D${row}`).value  = 0.04;  ws.getCell(`D${row}`).numFmt = nf2; ws.getCell(`D${row}`).alignment = aL; ws.getCell(`D${row}`).border = { left:thin() }; ws.getCell(`D${row}`).font = cg10
-  ws.getCell(`E${row}`).value  = { formula:`C${row}*D${row}` }; ws.getCell(`E${row}`).numFmt = nf; ws.getCell(`E${row}`).border = { left:thin() }; ws.getCell(`E${row}`).font = cg10
-  ws.getCell(`F${row}`).border = { left:thin(), right:dbl() }
+  bordered(row)
+  put(`B${row}`, 'CNSS', cg10)
+  put(`C${row}`, brutCot, cg10, nf)
+  put(`D${row}`, 0.04, cg10, '0%', aL)
+  put(`E${row}`, { formula:`ROUND(C${row}*D${row},0)`, result: cnssVal }, cg10, nf)
   row++
 
   // ── AMU ──────────────────────────────────────────────────────────────────
   const amuRow = row
-  ws.getCell(`A${row}`).border = { left:dbl(), right:thin() }
-  ws.getCell(`B${row}`).value  = 'AMU'; ws.getCell(`B${row}`).font = cg10; ws.getCell(`B${row}`).border = { left:thin() }
-  ws.getCell(`C${row}`).value  = { formula:`F${brutRow}` }; ws.getCell(`C${row}`).numFmt = nf; ws.getCell(`C${row}`).border = { left:thin() }; ws.getCell(`C${row}`).font = cg10
-  ws.getCell(`D${row}`).value  = 0.05;  ws.getCell(`D${row}`).numFmt = nf2; ws.getCell(`D${row}`).alignment = aL; ws.getCell(`D${row}`).border = { left:thin() }; ws.getCell(`D${row}`).font = cg10
-  ws.getCell(`E${row}`).value  = { formula:`C${row}*D${row}` }; ws.getCell(`E${row}`).numFmt = nf; ws.getCell(`E${row}`).border = { left:thin() }; ws.getCell(`E${row}`).font = cg10
-  ws.getCell(`F${row}`).border = { left:thin(), right:dbl() }
+  bordered(row)
+  put(`B${row}`, 'AMU', cg10)
+  put(`C${row}`, brutCot, cg10, nf)
+  put(`D${row}`, 0.05, cg10, '0%', aL)
+  put(`E${row}`, { formula:`ROUND(C${row}*D${row},0)`, result: amuVal }, cg10, nf)
   row++
 
   // ── IRPP ─────────────────────────────────────────────────────────────────
   const irppRow = row
-  ws.getCell(`A${row}`).border = { left:dbl(), right:thin() }
-  ws.getCell(`B${row}`).value  = 'IRPP '; ws.getCell(`B${row}`).font = cg10; ws.getCell(`B${row}`).border = { left:thin() }
-  // Ref: C36 = =(F33*0.91*0.72)  — base IRPP calculée
-  ws.getCell(`C${row}`).value  = data.irpp_base != null ? data.irpp_base : { formula:`FLOOR(F${brutRow}*0.91,1000)` }
-  ws.getCell(`C${row}`).numFmt = nf; ws.getCell(`C${row}`).border = { left:thin() }; ws.getCell(`C${row}`).font = cg10
-  ws.getCell(`D${row}`).value  = 0;  ws.getCell(`D${row}`).numFmt = nf; ws.getCell(`D${row}`).border = { left:thin() }; ws.getCell(`D${row}`).font = cg10
-  ws.getCell(`E${row}`).value  = data.irpp || 0; ws.getCell(`E${row}`).numFmt = nf; ws.getCell(`E${row}`).border = { left:thin() }; ws.getCell(`E${row}`).font = cg10
-  ws.getCell(`F${row}`).border = { left:thin(), right:dbl() }
+  bordered(row)
+  put(`B${row}`, 'IRPP', cg10)
+  if (data.irpp_base != null) put(`C${row}`, n(data.irpp_base), cg10, nf)
+  put(`E${row}`, irppVal, cg10, nf)
   row++
 
-  // ── Total Retenues Légales ─────────────────────────────────────────────────
+  // ── Total retenues légales ───────────────────────────────────────────────
   const totRetRow = row
-  ws.getCell(`A${row}`).border = { left:dbl(), right:thin() }
-  ws.getCell(`B${row}`).value  = 'Total Retenues Légales'; ws.getCell(`B${row}`).font = cg10b; ws.getCell(`B${row}`).border = { left:thin() }
-  ws.getCell(`C${row}`).border = { left:thin() }
-  ws.getCell(`D${row}`).border = { left:thin() }
-  ws.getCell(`E${row}`).value  = { formula:`SUM(E${cnssRow}:E${irppRow})` }
-  ws.getCell(`E${row}`).numFmt = nf; ws.getCell(`E${row}`).font = cg10b; ws.getCell(`E${row}`).border = { left:thin() }
-  ws.getCell(`F${row}`).border = { left:thin(), right:dbl() }
+  bordered(row)
+  put(`B${row}`, 'Total Retenues Légales', cg10b)
+  put(`E${row}`, { formula:`SUM(E${cnssRow}:E${irppRow})`, result: totRetLegal }, cg10b, nf)
   row++
 
-  // ── Salaire Net légal ─────────────────────────────────────────────────────
+  // ── Salaire net légal ────────────────────────────────────────────────────
   const netLegalRow = row
-  ws.getCell(`A${row}`).border = { left:dbl(), right:thin() }
-  ws.getCell(`B${row}`).value  = 'Salaire Net (après Retenues Légales)'; ws.getCell(`B${row}`).font = cg10b; ws.getCell(`B${row}`).border = { left:thin() }
-  ws.getCell(`C${row}`).border = { left:thin() }
-  ws.getCell(`D${row}`).border = { left:thin() }
-  ws.getCell(`E${row}`).border = { left:thin() }
-  ws.getCell(`F${row}`).value  = { formula:`F${brutRow}-E${totRetRow}` }
-  ws.getCell(`F${row}`).numFmt = nf; ws.getCell(`F${row}`).font = cg10b; ws.getCell(`F${row}`).border = { left:thin(), right:dbl() }
+  bordered(row)
+  put(`B${row}`, 'Salaire Net (après Retenues Légales)', cg10b)
+  put(`F${row}`, { formula:`F${brutRow}-E${totRetRow}`, result: netLegalVal }, cg10b, nf)
   row++
 
-  // ── Retenue avance ────────────────────────────────────────────────────────
-  const avRow = row
-  ws.getCell(`A${row}`).border = { left:dbl(), right:thin() }
-  ws.getCell(`B${row}`).value  = 'Retenue avance sur salaire'; ws.getCell(`B${row}`).font = cg10; ws.getCell(`B${row}`).border = { left:thin() }
-  ws.getCell(`C${row}`).border = { left:thin() }
-  ws.getCell(`D${row}`).border = { left:thin() }
-  ws.getCell(`E${row}`).value  = data.avance_salaire || 0; ws.getCell(`E${row}`).numFmt = nf; ws.getCell(`E${row}`).font = cg10; ws.getCell(`E${row}`).border = { left:thin() }
-  ws.getCell(`F${row}`).border = { left:thin(), right:dbl() }
-  row++
-
-  // ── Total Autres retenues ─────────────────────────────────────────────────
+  // ── Autres retenues (avance, prêt, déduction forfaitaire) ─────────────────
+  const autFirst = row
+  for (const r of autres) {
+    bordered(row)
+    put(`B${row}`, r.label, cg10)
+    put(`E${row}`, n(r.montant), cg10, nf)
+    row++
+  }
+  const autLast = row - 1
   const autRow = row
-  ws.getCell(`A${row}`).border = { left:dbl(), right:thin() }
-  ws.getCell(`B${row}`).value  = 'Total Autres retenues'; ws.getCell(`B${row}`).font = cg10b; ws.getCell(`B${row}`).border = { left:thin() }
-  ws.getCell(`C${row}`).border = { left:thin() }
-  ws.getCell(`D${row}`).border = { left:thin() }
-  ws.getCell(`E${row}`).value  = { formula:`E${avRow}` }
-  ws.getCell(`E${row}`).numFmt = nf; ws.getCell(`E${row}`).font = cg10b; ws.getCell(`E${row}`).border = { left:thin() }
-  ws.getCell(`F${row}`).border = { left:thin(), right:dbl() }
+  bordered(row)
+  put(`B${row}`, 'Total Autres retenues', cg10b)
+  put(`E${row}`, autres.length ? { formula:`SUM(E${autFirst}:E${autLast})`, result: totAutres } : 0, cg10b, nf)
   row++
 
-  // ── NET A PAYER — A:E merged, fond bleu clair ─────────────────────────────
+  // ── NET A PAYER ──────────────────────────────────────────────────────────
   const netRow = row
   ws.mergeCells(`A${netRow}:E${netRow}`)
-  ws.getCell(`A${netRow}`).value     = 'NET A PAYER '
+  ws.getCell(`A${netRow}`).value     = 'NET A PAYER'
   ws.getCell(`A${netRow}`).font      = cg12b
-  ws.getCell(`A${netRow}`).alignment = aC
+  ws.getCell(`A${netRow}`).alignment = aCM
   ws.getCell(`A${netRow}`).fill      = fillNavy
   ws.getCell(`A${netRow}`).border    = { left:dbl(), right:thin(), top:thin(), bottom:dbl() }
-  ws.getRow(netRow).height = 15.75
-  // F: net a payer — ref: =F38 (net légal directement si avance=0, sinon =F38-E40)
-  const avanceVal    = data.avance_salaire || 0
-  const cnssVal      = Math.round(brutTotal * 0.04)
-  const amuVal       = Math.round(brutTotal * 0.05)
-  const patronalVal  = Math.round(brutTotal * 0.175)
-  const irppVal      = data.irpp || 0
-  const netLegalVal  = brutTotal - cnssVal - amuVal - irppVal
-  const netPayVal    = netLegalVal - avanceVal
-  ws.getCell(`F${netRow}`).value  = data.avance_salaire
-    ? { formula:`F${netLegalRow}-E${autRow}`, result: netPayVal }
-    : { formula:`F${netLegalRow}`, result: netPayVal }
-  ws.getCell(`F${netRow}`).numFmt = nfNet
-  ws.getCell(`F${netRow}`).font   = cg12b
+  ws.getRow(netRow).height = 18
+  put(`F${netRow}`, { formula:`F${netLegalRow}-E${autRow}`, result: netPayVal }, cg12b, nfNet, aCM)
   ws.getCell(`F${netRow}`).fill   = fillNavy
   ws.getCell(`F${netRow}`).border = { left:thin(), right:dbl(), top:thin(), bottom:dbl() }
   row += 2
 
-  // ── Charges patronales ────────────────────────────────────────────────────
+  // ── Charges patronales : libellé sur C:E, montant en F ───────────────────
+  const footer = (label, value, height) => {
+    ws.getRow(row).height = height
+    ws.mergeCells(`C${row}:E${row}`)
+    put(`C${row}`, label, cg8b, null, { horizontal:'right', vertical:'middle' })
+    put(`F${row}`, value, cg10b, nf, { horizontal:'right', vertical:'middle' })
+    row++
+  }
+  ws.getCell(`A${row}`).value = "Signature et Cachet de l'employeur"
+  ws.getCell(`A${row}`).font  = { name:'Century Gothic', size:10, bold:true }
+  ws.getCell(`A${row}`).alignment = { vertical:'middle' }
   const patRow = row
-  ws.getRow(row).height = 22.5
-  ws.getCell(`A${row}`).value     = "Signature et Cachet de l'employeur"
-  ws.getCell(`A${row}`).font      = { name:'Bookman Old Style', size:10, bold:true }
-  ws.getCell(`E${row}`).value     = 'Charges Patronales'
-  ws.getCell(`E${row}`).font      = cg8b
-  ws.getCell(`F${row}`).value     = { formula:`F${brutRow}*17.5%` }
-  ws.getCell(`F${row}`).numFmt    = nf
-  ws.getCell(`F${row}`).font      = cg10b
-  ws.getCell(`F${row}`).alignment = aC
-  row++
-
-  ws.getRow(row).height = 21.75
-  ws.getCell(`E${row}`).value     = 'AMU Part Patronale'
-  ws.getCell(`E${row}`).font      = cg8b
-  ws.getCell(`F${row}`).value     = { formula:`E${amuRow}` }
-  ws.getCell(`F${row}`).numFmt    = nf
-  ws.getCell(`F${row}`).font      = cg10b
-  ws.getCell(`F${row}`).alignment = aC
+  footer('Charges Patronales', { formula:`ROUND(C${cnssRow}*17.5%,0)`, result: patronalVal }, 22.5)
   const amuPatRow = row
-  row++
+  footer('AMU Part Patronale', { formula:`E${amuRow}`, result: amuPatVal }, 21.75)
+  footer('Masse Salariale', { formula:`F${brutRow}+F${patRow}+F${amuPatRow}`, result: masseVal }, 23.25)
 
-  ws.getRow(row).height = 23.25
-  ws.getCell(`E${row}`).value     = 'Masse Salariale'
-  ws.getCell(`E${row}`).font      = cg8b
-  ws.getCell(`F${row}`).value     = { formula:`F${brutRow}+F${patRow}+F${amuPatRow}`, result: brutTotal + patronalVal + amuVal }
-  ws.getCell(`F${row}`).numFmt    = nfNet
-  ws.getCell(`F${row}`).font      = cg10b
-  ws.getCell(`F${row}`).alignment = aC
-  row++
-
-  ws.getCell(`D${row}`).value     = "Signature de l'employé(e) "
-  ws.getCell(`D${row}`).font      = { name:'Century Gothic', size:10, bold:true }
+  ws.getCell(`A${row+1}`).value = "Signature de l'employé(e)"
+  ws.getCell(`A${row+1}`).font  = { name:'Century Gothic', size:10, bold:true }
 }
 
 
-// ─── ÉTAT DES CHARGES (imitation parfaite Etat_des_charges.xlsx) ──────────────
+// ─── ÉTAT DES CHARGES ─────────────────────────────────────────────────────────
 function genEtatCharges(wb, sheetName, title, employes, avecRegul) {
-  const ws = wb.addWorksheet(sheetName)
-  const nCols  = avecRegul ? 16 : 14
+  const ws = wb.addWorksheet(sheetName, { views: [{ state: 'frozen', xSplit: 2, ySplit: 2 }] })
+  const nCols   = avecRegul ? 16 : 14
   const lastCol = avecRegul ? 'P' : 'N'
+  const colLetter = (i) => String.fromCharCode(64 + i)
 
-  // Largeurs identiques à l'original
-  const widths = [4.14, 72.57, 20, 42, 17.71, 15.57, 26, 19, 18.86, 26, 22.29, 14.86, 31.86, 15.57, 20, 15.57]
-  for (let i = 0; i < nCols; i++) ws.getColumn(i+1).width = widths[i]
+  ws.pageSetup.orientation = 'landscape'
+  ws.pageSetup.paperSize   = 9
+  ws.pageSetup.fitToPage   = true
+  ws.pageSetup.fitToWidth  = 1
+  ws.pageSetup.fitToHeight = 0
 
-  // ── Titre ligne 1 ─────────────────────────────────────────────────────────
+  const widths = [5, 34, 24, 26, 14, 17, 17, 15, 15, 17, 15, 15, 17, 15, 17, 17]
+  for (let i = 0; i < nCols; i++) ws.getColumn(i + 1).width = widths[i]
+
+  const border = () => ({ left:thin(), right:thin(), top:thin(), bottom:thin() })
+  const headFill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFD9E1F2'} }
+  const zebra    = { type:'pattern', pattern:'solid', fgColor:{argb:'FFF5F7FA'} }
+
+  // Titre
   ws.mergeCells(`A1:${lastCol}1`)
-  ws.getRow(1).height = 26.25
-  ws.getRow(2).height = 18.75
+  ws.getRow(1).height = 34
   const t = ws.getCell('A1')
   t.value     = title
-  t.font      = { name:'Calibri', size:20, bold:false }
+  t.font      = { name:'Calibri', size:16, bold:true }
   t.alignment = { horizontal:'center', vertical:'middle', wrapText:true }
-  t.border    = { right:thin(), bottom:thin() }
+  t.border    = { bottom:thin() }
 
-  // ── Headers ligne 2 ───────────────────────────────────────────────────────
+  // En-têtes
   const headers = avecRegul
-    ? ['N°','Nom et Prénoms','Responsable','Poste','Pole','Salaire brut','Salaire brut imposable','CNSS Salarié 4%','AMU Salarié 5%','CNSS Patronale 17,5%','AMU Patronale 5%','IRPP Salarié','REGULARISATION IRPP','IRPP A PAYER','TOTAL RETENUES SALARIES','NET A PAYER']
-    : ['N°','Nom et Prénoms','Responsable','Poste','Pole','Salaire brut','Salaire brut imposable','CNSS Salarié 4%','AMU Salarié 5%','CNSS Patronale 17,5%','AMU Patronale 5%','IRPP Salarié','TOTAL RETENUES SALARIES','NET A PAYER']
-
-  const headerFill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFD9E1F2'} }
-  for (let ci=1; ci<=headers.length; ci++) {
-    const c = ws.getRow(2).getCell(ci)
-    c.value     = headers[ci-1]
-    c.font      = { name:'Calibri', size:14, bold:false }
+    ? ['N°','Nom et Prénoms','Responsable','Poste','Pôle','Salaire brut','Salaire brut imposable','CNSS Salarié 4%','AMU Salarié 5%','CNSS Patronale 17,5%','AMU Patronale 5%','IRPP Salarié','Régularisation IRPP','IRPP à payer','Total retenues salariés','Net à payer']
+    : ['N°','Nom et Prénoms','Responsable','Poste','Pôle','Salaire brut','Salaire brut imposable','CNSS Salarié 4%','AMU Salarié 5%','CNSS Patronale 17,5%','AMU Patronale 5%','IRPP Salarié','Total retenues salariés','Net à payer']
+  headers.forEach((h, i) => {
+    const c = ws.getRow(2).getCell(i + 1)
+    c.value = h; c.font = { name:'Calibri', size:11, bold:true }
     c.alignment = { horizontal:'center', vertical:'middle', wrapText:true }
-    c.fill      = headerFill
-    c.border    = { left:thin(), right:thin(), top:thin(), bottom:thin() }
-  }
-  ws.getRow(2).height = 50
+    c.fill = headFill; c.border = border()
+  })
+  ws.getRow(2).height = 44
 
-  // ── Lignes employés ───────────────────────────────────────────────────────
-  for (let i=0; i<employes.length; i++) {
-    const r   = i+3
-    const emp = employes[i]
-    const rowFill = i%2===1 ? { type:'pattern', pattern:'solid', fgColor:{argb:'FFF2F2F2'} } : null
+  // Lignes employés : chaque montant est un nombre, chaque formule porte son résultat
+  const sums = {}
+  const addSum = (ci, v) => { sums[ci] = (sums[ci] || 0) + v }
+  employes.forEach((emp, i) => {
+    const r        = i + 3
+    const base     = n(emp.brut_imposable)
+    const brut     = emp.brut != null ? n(emp.brut) : base
+    const cnssS    = Math.round(base * 0.04)
+    const amuS     = Math.round(base * 0.05)
+    const cnssP    = Math.round(base * 0.175)
+    const amuP     = Math.round(base * 0.05)
+    const irpp     = n(emp.irpp)
+    const regul    = n(emp.regularisation_irpp)
+    const irppPay  = irpp + regul
+    const totalRet = cnssS + amuS + (avecRegul ? irppPay : irpp)
+    const net      = n(emp.net_payer)
+    const zebraFill = i % 2 === 1 ? zebra : null
 
-    // Colonnes texte A-E
-    const textes = [i+1, emp.nom, emp.responsable||'', emp.poste||'', emp.pole||'']
-    const txSizes = [14,15,15,12,12]
-    for (let ci=1; ci<=5; ci++) {
+    const texts = [i + 1, emp.nom, emp.responsable || '', emp.poste || '', emp.pole || '']
+    texts.forEach((v, ci) => {
+      const c = ws.getRow(r).getCell(ci + 1)
+      c.value = v; c.font = { name:'Calibri', size:11 }
+      c.alignment = { horizontal: ci === 0 ? 'center' : 'left', vertical:'middle', wrapText: ci === 1 || ci === 2 }
+      c.border = border(); if (zebraFill) c.fill = zebraFill
+    })
+
+    const cells = avecRegul
+      ? [brut, base, {formula:`ROUND(G${r}*4%,0)`,result:cnssS}, {formula:`ROUND(G${r}*5%,0)`,result:amuS}, {formula:`ROUND(G${r}*17.5%,0)`,result:cnssP}, {formula:`ROUND(G${r}*5%,0)`,result:amuP}, irpp, regul, {formula:`L${r}+M${r}`,result:irppPay}, {formula:`H${r}+I${r}+N${r}`,result:totalRet}, net]
+      : [brut, base, {formula:`ROUND(G${r}*4%,0)`,result:cnssS}, {formula:`ROUND(G${r}*5%,0)`,result:amuS}, {formula:`ROUND(G${r}*17.5%,0)`,result:cnssP}, {formula:`ROUND(G${r}*5%,0)`,result:amuP}, irpp, {formula:`H${r}+I${r}+L${r}`,result:totalRet}, net]
+    cells.forEach((v, idx) => {
+      const ci = idx + 6
       const c = ws.getRow(r).getCell(ci)
-      c.value     = textes[ci-1]
-      c.font      = { name:'Calibri', size:txSizes[ci-1], bold:false }
-      c.alignment = { horizontal: ci===1?'center':'left', vertical:'middle', wrapText:ci===2||ci===3 }
-      c.border    = { left:thin(), right:thin(), top:thin(), bottom:thin() }
-      if (rowFill) c.fill = rowFill
-    }
-
-    // Colonnes numériques: formules identiques à l'original
-    // F=brut (N+M ou P+O), G=brut imposable, H=G*4%, I=G*5%, J=G*17.5%, K=G*5%, L=IRPP
-    // sans régul: M=H+I+L, N=net_payer
-    // avec régul: M=IRPP_salarié, N=regul, O=L+M (IRPP à payer), P=H+I+O, Q=net_payer → décalé
-    const vals = avecRegul
-      ? [
-          [6,  {formula:`+P${r}+O${r}`}],
-          [7,  emp.brut_imposable],
-          [8,  {formula:`+G${r}*4%`}],
-          [9,  {formula:`+G${r}*5%`}],
-          [10, {formula:`+G${r}*17.5%`}],
-          [11, {formula:`+G${r}*5%`}],
-          [12, emp.irpp],
-          [13, emp.regularisation_irpp || 0],
-          [14, {formula:`L${r}+M${r}`}],
-          [15, {formula:`H${r}+I${r}+N${r}`}],
-          [16, emp.net_payer],
-        ]
-      : [
-          [6,  {formula:`+N${r}+M${r}`}],
-          [7,  emp.brut_imposable],
-          [8,  {formula:`+G${r}*4%`}],
-          [9,  {formula:`+G${r}*5%`}],
-          [10, {formula:`+G${r}*17.5%`}],
-          [11, {formula:`+G${r}*5%`}],
-          [12, emp.irpp],
-          [13, {formula:`H${r}+I${r}+L${r}`}],
-          [14, emp.net_payer],
-        ]
-
-    for (const [ci, val] of vals) {
-      const c = ws.getRow(r).getCell(ci)
-      c.value     = val
-      c.font      = { name:'Calibri', size:14, bold:false }
+      c.value = v; c.font = { name:'Calibri', size:11 }
       c.alignment = { horizontal:'right', vertical:'middle' }
-      c.numFmt    = '#,##0'
-      c.border    = { left:thin(), right:thin(), top:thin(), bottom:thin() }
-      if (rowFill) c.fill = rowFill
-    }
-    ws.getRow(r).height = 19.5
-  }
+      c.numFmt = '#,##0'; c.border = border(); if (zebraFill) c.fill = zebraFill
+      addSum(ci, typeof v === 'object' ? v.result : v)
+    })
+    ws.getRow(r).height = 20
+  })
 
-  // ── Ligne TOTAL ───────────────────────────────────────────────────────────
-  const tr    = employes.length + 3
+  // Total
+  const tr = employes.length + 3
   const lastR = tr - 1
-  const totalFill = { type:'pattern', pattern:'solid', fgColor:{argb:'FF1F3864'} }
-  const totalFont = { name:'Calibri', size:13, bold:true, color:{argb:'FFFFFFFF'} }
-
-  ws.getRow(tr).getCell(2).value     = 'TOTAL'
-  ws.getRow(tr).getCell(2).font      = { name:'Calibri', size:14, bold:true }
-  ws.getRow(tr).getCell(2).alignment = { horizontal:'center', vertical:'middle' }
-  ws.getRow(tr).getCell(2).border    = { left:thin(), right:thin(), top:thin(), bottom:thin() }
-  ws.getRow(tr).height = 18.75
-
-  for (let ci=6; ci<=nCols; ci++) {
-    const lc   = String.fromCharCode(64+ci)
-    const c    = ws.getRow(tr).getCell(ci)
-    c.value    = { formula:`SUM(${lc}3:${lc}${lastR})` }
-    c.font     = { name:'Calibri', size:14, bold:true }
-    c.alignment= { horizontal:'right', vertical:'middle' }
-    c.border   = { left:thin(), right:thin(), top:thin(), bottom:thin() }
-    c.numFmt   = '#,##0'
+  const labelCell = ws.getRow(tr).getCell(2)
+  labelCell.value = 'TOTAL'; labelCell.font = { name:'Calibri', size:11, bold:true }
+  labelCell.alignment = { horizontal:'center', vertical:'middle' }
+  for (let ci = 1; ci <= nCols; ci++) {
+    const c = ws.getRow(tr).getCell(ci)
+    c.border = border()
+    c.fill = headFill
+    if (ci >= 6) {
+      const lc = colLetter(ci)
+      c.value = employes.length ? { formula:`SUM(${lc}3:${lc}${lastR})`, result: sums[ci] || 0 } : 0
+      c.font = { name:'Calibri', size:11, bold:true }
+      c.alignment = { horizontal:'right', vertical:'middle' }
+      c.numFmt = '#,##0'
+    }
   }
+  ws.getRow(tr).height = 22
 
-  // ── Récap en bas ──────────────────────────────────────────────────────────
-  let rr = tr + 3
+  // Récapitulatif
+  const S = (ci) => sums[ci] || 0
+  const irppTotal = avecRegul ? S(14) : S(12)
+  const cnssSal = S(8) + S(9), cnssPat = S(10) + S(11)
   const recap = [
-    ['CNSS PART SALARIALE à Payer',  `SUM(H3:H${lastR})+SUM(I3:I${lastR})`],
-    ['CNSS PART PATRONALE à Payer',  `SUM(J3:J${lastR})+SUM(K3:K${lastR})`],
-    ['Total CNSS',                    `SUM(H3:H${lastR})+SUM(I3:I${lastR})+SUM(J3:J${lastR})+SUM(K3:K${lastR})`],
-    ['IRPP à payer',                  avecRegul ? `SUM(N3:N${lastR})` : `SUM(L3:L${lastR})`],
-    ['Montant Global à payer',        avecRegul
-      ? `SUM(H3:H${lastR})+SUM(I3:I${lastR})+SUM(J3:J${lastR})+SUM(K3:K${lastR})+SUM(N3:N${lastR})`
-      : `SUM(H3:H${lastR})+SUM(I3:I${lastR})+SUM(J3:J${lastR})+SUM(K3:K${lastR})+SUM(L3:L${lastR})`],
+    ['CNSS part salariale à payer', cnssSal,                    `SUM(H3:H${lastR})+SUM(I3:I${lastR})`],
+    ['CNSS part patronale à payer', cnssPat,                    `SUM(J3:J${lastR})+SUM(K3:K${lastR})`],
+    ['Total CNSS',                  cnssSal + cnssPat,          `SUM(H3:K${lastR})`],
+    ['IRPP à payer',                irppTotal,                  avecRegul ? `SUM(N3:N${lastR})` : `SUM(L3:L${lastR})`],
+    ['Montant global à payer',      cnssSal + cnssPat + irppTotal, avecRegul ? `SUM(H3:K${lastR})+SUM(N3:N${lastR})` : `SUM(H3:L${lastR})`],
   ]
-  for (const [label, formula] of recap) {
-    const cLabel = ws.getRow(rr).getCell(3)
-    cLabel.value  = label
-    cLabel.font   = { name:'Calibri', size:13, bold:true }
-    cLabel.fill   = { type:'pattern', pattern:'solid', fgColor:{argb:'FFD9E1F2'} }
-    cLabel.border = { left:thin(), right:thin(), top:thin(), bottom:thin() }
-    ws.getRow(rr).height = 17.25
-    const cVal   = ws.getRow(rr).getCell(4)
-    cVal.value   = { formula }
-    cVal.numFmt  = '#,##0'
-    cVal.font    = { name:'Calibri', size:13, bold:true }
-    cVal.fill    = { type:'pattern', pattern:'solid', fgColor:{argb:'FFD9E1F2'} }
-    cVal.border  = { left:thin(), right:thin(), top:thin(), bottom:thin() }
+  let rr = tr + 2
+  for (const [label, value, formula] of recap) {
+    ws.mergeCells(`B${rr}:D${rr}`)
+    const cl = ws.getCell(`B${rr}`)
+    cl.value = label; cl.font = { name:'Calibri', size:11, bold:true }
+    cl.alignment = { horizontal:'left', vertical:'middle', indent:1 }
+    cl.fill = headFill; cl.border = border()
+    for (const col of ['C','D']) { ws.getCell(`${col}${rr}`).border = border(); ws.getCell(`${col}${rr}`).fill = headFill }
+    const cv = ws.getCell(`E${rr}`)
+    cv.value = employes.length ? { formula, result: value } : 0
+    cv.numFmt = '#,##0'; cv.font = { name:'Calibri', size:11, bold:true }
+    cv.alignment = { horizontal:'right', vertical:'middle' }
+    cv.fill = headFill; cv.border = border()
+    ws.getRow(rr).height = 20
     rr++
   }
+  ws.mergeCells(`B${rr + 1}:H${rr + 1}`)
+  const note = ws.getCell(`B${rr + 1}`)
+  note.value = 'Le net à payer tient compte des avances, remboursements de prêt et déductions forfaitaires saisis dans les variables de paie.'
+  note.font = { name:'Calibri', size:9, italic:true, color:{argb:'FF666666'} }
 }
 
 // ─── SOLDE DE TOUT COMPTE (imitation parfaite SOLDE_DE_TT_COMPTE.xlsx) ────────
+
+// Base des cotisations du solde de tout compte : le total brut moins cette part non cotisable
+// (valeur issue du modèle de référence).
+const SOLDE_PART_NON_COTISABLE = 140000
+
+/** Calcule tous les montants du solde de tout compte. Source unique pour l'Excel et l'aperçu. */
+function computeSolde(d) {
+  const salaireMois = n(d.salaire_mois)
+  const baseConges  = n(d.base_conges)
+  const jours       = (d.jours_conges_list || []).filter(j => n(j[0]) > 0)
+  const taux        = d.taux_conges_auto && jours.length ? jours.reduce((sum, j) => sum + n(j[0]), 0) / 30 : n(d.taux_conges_manuel)
+  const indConges   = Math.round(baseConges * taux)
+  const totalBrut   = salaireMois + indConges
+  const baseCot     = Math.max(0, totalBrut - SOLDE_PART_NON_COTISABLE)
+  const cnss        = Math.round(baseCot * 0.04)
+  const amu         = Math.round(baseCot * 0.05)
+  const irpp        = n(d.irpp)
+  const arrieres    = n(d.retenues_arrierees)
+  const totalRet    = cnss + amu + irpp + arrieres
+  const netSolde    = totalBrut - totalRet
+  const preavis     = d.inclure_preavis ? n(d.preavis) : 0
+  const avance      = n(d.avance)
+  const retSolde    = n(d.retenue_sur_solde)
+  const netFinal    = netSolde - preavis - avance - retSolde
+  return { salaireMois, baseConges, jours, taux, indConges, totalBrut, baseCot, cnss, amu, irpp, arrieres, totalRet, netSolde, preavis, avance, retSolde, netFinal }
+}
+
 function genSolde(wb, sheetName, data) {
+  const k = computeSolde(data)
   const ws = wb.addWorksheet(sheetName)
 
   // Largeurs identiques à l'original
@@ -706,8 +715,8 @@ function genSolde(wb, sheetName, data) {
   ws.getColumn(4).width = 10
   ws.getColumn(5).width = 20
   ws.getColumn(6).width = 18
-  ws.getColumn(7).width = 10
-  ws.getColumn(8).width = 14.285
+  ws.getColumn(7).width = 15
+  ws.getColumn(8).width = 17
 
   ws.pageSetup.orientation = 'portrait'
   ws.pageSetup.paperSize   = 9
@@ -765,7 +774,7 @@ function genSolde(wb, sheetName, data) {
   setRow(12, 28.5)
   ws.mergeCells('B12:E12')
   sc(ws,'B12',`\u00a0 ${data.salaire_mois_label||'SALAIRE MOIS'} `, font16, { horizontal:'left', vertical:'middle' })
-  ws.getCell('H12').value  = data.salaire_mois || 0
+  ws.getCell('H12').value  = k.salaireMois
   ws.getCell('H12').font   = font16
   ws.getCell('H12').numFmt = '#,##0'
   ws.getCell('H12').alignment = { horizontal:'right' }
@@ -774,38 +783,38 @@ function genSolde(wb, sheetName, data) {
   setRow(13, 27.75)
   ws.mergeCells('B13:E13')
   sc(ws,'B13','INDEMNITE DE CONGES ACQUIS NON JOUIR ', font16, { horizontal:'left', vertical:'middle' })
-  ws.getCell('F13').value  = data.base_conges || 0
+  ws.getCell('F13').value  = k.baseConges
   ws.getCell('F13').font   = font16b
   ws.getCell('F13').numFmt = '#,##0'
   ws.getCell('F13').alignment = { horizontal:'right' }
-  const jours = data.jours_conges_list || []
+  const jours = k.jours
   if (data.taux_conges_auto && jours.length) {
-    ws.getCell('G13').value = { formula:`(${jours.map(([j])=>j).join('+')})/30` }
+    ws.getCell('G13').value = { formula:`(${jours.map(([j])=>n(j)).join('+')})/30`, result: k.taux }
   } else {
-    ws.getCell('G13').value = data.taux_conges_manuel || 0
+    ws.getCell('G13').value = k.taux
   }
   ws.getCell('G13').font      = font16
   ws.getCell('G13').alignment = { horizontal:'center' }
-  ws.getCell('G13').numFmt    = '0.000000'
-  ws.getCell('H13').value     = { formula:'F13*G13' }
+  ws.getCell('G13').numFmt    = '0.0000'
+  ws.getCell('H13').value     = { formula:'ROUND(F13*G13,0)', result: k.indConges }
   ws.getCell('H13').font      = font16
-  ws.getCell('H13').numFmt    = '#,##0.00'
+  ws.getCell('H13').numFmt    = '#,##0'
   ws.getCell('H13').alignment = { horizontal:'right' }
 
   // ── TOTAL BRUT (row 14) ───────────────────────────────────────────────────
   setRow(14, 29.25)
   ws.mergeCells('B14:E14')
   sc(ws,'B14',' TOTAL BRUT SOLDE DE TOUT COMPTE', font16b, { horizontal:'left', vertical:'middle' })
-  ws.getCell('H14').value  = { formula:'H12+H13' }
+  ws.getCell('H14').value  = { formula:'H12+H13', result: k.totalBrut }
   ws.getCell('H14').font   = font16
-  ws.getCell('H14').numFmt = '#,##0.00'
+  ws.getCell('H14').numFmt = '#,##0'
   ws.getCell('H14').alignment = { horizontal:'right' }
 
   // ── CNSS (row 15) — base = H14-140000 comme l'original ───────────────────
   setRow(15, 29.25)
   ws.mergeCells('B15:E15')
   sc(ws,'B15','CNSS', font16, { horizontal:'left', vertical:'middle' })
-  ws.getCell('F15').value     = { formula:'H14-140000' }
+  ws.getCell('F15').value     = { formula:`MAX(0,H14-${SOLDE_PART_NON_COTISABLE})`, result: k.baseCot }
   ws.getCell('F15').font      = font16b
   ws.getCell('F15').numFmt    = '#,##0'
   ws.getCell('F15').alignment = { horizontal:'right' }
@@ -813,7 +822,7 @@ function genSolde(wb, sheetName, data) {
   ws.getCell('G15').font      = font16
   ws.getCell('G15').numFmt    = '0%'
   ws.getCell('G15').alignment = { horizontal:'center' }
-  ws.getCell('H15').value     = { formula:'F15*G15' }
+  ws.getCell('H15').value     = { formula:'ROUND(F15*G15,0)', result: k.cnss }
   ws.getCell('H15').font      = font16
   ws.getCell('H15').numFmt    = '#,##0'
   ws.getCell('H15').alignment = { horizontal:'right' }
@@ -822,7 +831,7 @@ function genSolde(wb, sheetName, data) {
   setRow(16, 29.25)
   ws.mergeCells('B16:E16')
   sc(ws,'B16','AMU', font16, { horizontal:'left', vertical:'middle' })
-  ws.getCell('F16').value     = { formula:'H14-140000' }
+  ws.getCell('F16').value     = { formula:`MAX(0,H14-${SOLDE_PART_NON_COTISABLE})`, result: k.baseCot }
   ws.getCell('F16').font      = font16b
   ws.getCell('F16').numFmt    = '#,##0'
   ws.getCell('F16').alignment = { horizontal:'right' }
@@ -830,7 +839,7 @@ function genSolde(wb, sheetName, data) {
   ws.getCell('G16').font      = font16
   ws.getCell('G16').numFmt    = '0%'
   ws.getCell('G16').alignment = { horizontal:'center' }
-  ws.getCell('H16').value     = { formula:'F16*G16' }
+  ws.getCell('H16').value     = { formula:'ROUND(F16*G16,0)', result: k.amu }
   ws.getCell('H16').font      = font16
   ws.getCell('H16').numFmt    = '#,##0'
   ws.getCell('H16').alignment = { horizontal:'right' }
@@ -839,7 +848,7 @@ function genSolde(wb, sheetName, data) {
   setRow(17, 27.0)
   ws.mergeCells('B17:E17')
   sc(ws,'B17','IRPP', font16, { horizontal:'left', vertical:'middle' })
-  ws.getCell('H17').value     = data.irpp || 0
+  ws.getCell('H17').value     = k.irpp
   ws.getCell('H17').font      = font16
   ws.getCell('H17').numFmt    = '#,##0'
   ws.getCell('H17').alignment = { horizontal:'right' }
@@ -847,11 +856,11 @@ function genSolde(wb, sheetName, data) {
   let r = 18
 
   // Retenues arriérées si présentes
-  if (data.retenues_arrierees) {
+  if (k.arrieres) {
     setRow(r, 28.5)
     ws.mergeCells(`B${r}:E${r}`)
     sc(ws,`B${r}`,'TOTAL RETENUES ARRIEREES RESTANT A PRELEVE', font16, { horizontal:'left', vertical:'middle' })
-    ws.getCell(`H${r}`).value     = data.retenues_arrierees
+    ws.getCell(`H${r}`).value     = k.arrieres
     ws.getCell(`H${r}`).font      = font16
     ws.getCell(`H${r}`).numFmt    = '#,##0'
     ws.getCell(`H${r}`).alignment = { horizontal:'right' }
@@ -862,8 +871,8 @@ function genSolde(wb, sheetName, data) {
   setRow(r, 28.5)
   ws.mergeCells(`B${r}:E${r}`)
   sc(ws,`B${r}`,'TOTAL DES RETENUES', font16b, { horizontal:'left', vertical:'middle' })
-  const totalFormula = data.retenues_arrierees ? `H15+H16+H17+H${r-1}` : 'H15+H16+H17'
-  ws.getCell(`H${r}`).value     = { formula: totalFormula }
+  const totalFormula = k.arrieres ? `H15+H16+H17+H${r-1}` : 'H15+H16+H17'
+  ws.getCell(`H${r}`).value     = { formula: totalFormula, result: k.totalRet }
   ws.getCell(`H${r}`).font      = font16b
   ws.getCell(`H${r}`).numFmt    = '#,##0'
   ws.getCell(`H${r}`).alignment = { horizontal:'right' }
@@ -873,7 +882,7 @@ function genSolde(wb, sheetName, data) {
   setRow(r, 28.5)
   ws.mergeCells(`B${r}:E${r}`)
   sc(ws,`B${r}`,'SALAIRE NET SOLDE DE TOUT COMPTE', { name:'Calibri', size:16, bold:true, color:{argb:'FFC00000'} }, { horizontal:'left', vertical:'middle' })
-  ws.getCell(`H${r}`).value     = { formula:`H14-H${totR}` }
+  ws.getCell(`H${r}`).value     = { formula:`H14-H${totR}`, result: k.netSolde }
   ws.getCell(`H${r}`).font      = font16b
   ws.getCell(`H${r}`).numFmt    = '#,##0'
   ws.getCell(`H${r}`).alignment = { horizontal:'right' }
@@ -881,11 +890,11 @@ function genSolde(wb, sheetName, data) {
 
   // ── Préavis (optionnel) ───────────────────────────────────────────────────
   let preR = null
-  if (data.inclure_preavis) {
+  if (k.preavis) {
     setRow(r, 25.5)
     ws.mergeCells(`B${r}:E${r}`)
     sc(ws,`B${r}`,'MONTANT DU PREAVIS', font16b, { horizontal:'left', vertical:'middle' })
-    ws.getCell(`H${r}`).value     = data.preavis || 0
+    ws.getCell(`H${r}`).value     = k.preavis
     ws.getCell(`H${r}`).font      = font16b
     ws.getCell(`H${r}`).numFmt    = '#,##0'
     ws.getCell(`H${r}`).alignment = { horizontal:'right' }
@@ -896,7 +905,7 @@ function genSolde(wb, sheetName, data) {
   setRow(r, 25.5)
   ws.mergeCells(`B${r}:E${r}`)
   sc(ws,`B${r}`,'AVANCE SUR SOLDE DE TOUT COMPTE', font16b, { horizontal:'left', vertical:'middle' })
-  ws.getCell(`H${r}`).value     = data.avance || 0
+  ws.getCell(`H${r}`).value     = k.avance
   ws.getCell(`H${r}`).font      = font16b
   ws.getCell(`H${r}`).numFmt    = '#,##0'
   ws.getCell(`H${r}`).alignment = { horizontal:'right' }
@@ -904,11 +913,11 @@ function genSolde(wb, sheetName, data) {
 
   // ── RETENUE SUR SOLDE DE TOUT COMPTE ─────────────────────────────────────
   let retSoldeR = null
-  if (data.retenue_sur_solde) {
+  if (k.retSolde) {
     setRow(r, 25.5)
     ws.mergeCells(`B${r}:E${r}`)
     sc(ws,`B${r}`,'RETENUE SUR SOLDE DE TOUT COMPTE', font16b, { horizontal:'left', vertical:'middle' })
-    ws.getCell(`H${r}`).value     = data.retenue_sur_solde
+    ws.getCell(`H${r}`).value     = k.retSolde
     ws.getCell(`H${r}`).font      = font16b
     ws.getCell(`H${r}`).numFmt    = '#,##0'
     ws.getCell(`H${r}`).alignment = { horizontal:'right' }
@@ -923,7 +932,7 @@ function genSolde(wb, sheetName, data) {
   const netPayFormula = netPayParts.length === 1
     ? `H${netPayParts[0]}`
     : `H${netPayParts[0]}-${netPayParts.slice(1).map(x=>`H${x}`).join('-')}`
-  ws.getCell(`H${r}`).value     = { formula: netPayFormula }
+  ws.getCell(`H${r}`).value     = { formula: netPayFormula, result: k.netFinal }
   ws.getCell(`H${r}`).font      = font16b
   ws.getCell(`H${r}`).numFmt    = '#,##0'
   ws.getCell(`H${r}`).alignment = { horizontal:'right' }
@@ -935,7 +944,7 @@ function genSolde(wb, sheetName, data) {
   if (jours.length) {
     const noteR = r + 3
     ws.getRow(noteR).height    = 15.75
-    const total = jours.map(([j])=>j).join(' + ')
+    const total = jours.map(([j])=>n(j)).join(' + ')
     ws.getCell(`B${noteR}`).value = `TAUX DE CONGES ACQUIS NON JOUIR= (${total}) / 30 jours`
     ws.getCell(`B${noteR}`).font  = { name:'Calibri', size:12, bold:true }
     jours.forEach(([j,l], idx) => {
@@ -986,13 +995,13 @@ export default async function handler(req, res) {
         WHERE pv.period_id=${period_id} AND pv.employee_id=${employee_id} AND c.organization_id=${auth.orgId}
       `
       if (!rows.length) return res.status(404).json({ error: 'Variables de paie introuvables. Enregistrez d\'abord les variables dans la période de paie.' })
-      const v = rows[0]
+      const v = normalizeRow(rows[0])
       const MOIS = ['JANVIER','FEVRIER','MARS','AVRIL','MAI','JUIN','JUILLET','AOUT','SEPTEMBRE','OCTOBRE','NOVEMBRE','DECEMBRE']
       const mois = MOIS[(v.period_month||1)-1]
-      const brutCotisable = calcBrut(v) - (v.indemnite_grossesse || 0)  // base CNSS/AMU/IRPP
-      const brut = calcBrut(v)                                           // brut total affiché
-      const pers = calcPersonnesCharge(v.marital_status, v.children_count)
-      const irpp = calcIrppMensuel(brutCotisable, pers)
+      const calc = calcPayrollFromRow(v)
+      const brutCotisable = calc.cotisable
+      const pers = calc.personnes
+      const irpp = calc.irpp
 
       const rubriques = []
       if (v.base_salary)         rubriques.push({ label:'Salaire de Base',        base:v.base_salary,        taux_ou_nb:30 })
@@ -1003,6 +1012,7 @@ export default async function handler(req, res) {
       if (v.indemnite_transport)     rubriques.push({ label:'Indemnité de Transport',    base:v.indemnite_transport,     taux_ou_nb:30 })
       if (v.indemnite_repas)         rubriques.push({ label:'Indemnité de repas',        base:v.indemnite_repas,         taux_ou_nb:30 })
       if (v.indemnite_communication) rubriques.push({ label:'Indemnité de communication',base:v.indemnite_communication, taux_ou_nb:30 })
+      for (const a of (v.indemnites_perso || [])) rubriques.push({ label: a.label + (a.cotisable ? '' : ' (exo.)'), base: a.amount, taux_ou_nb: 30 })
       if (v.indemnite_grossesse)     rubriques.push({ label:'Indemnité de grossesse (exo.)', base:v.indemnite_grossesse, taux_ou_nb:30 })
 
       let logoBuffer = null
@@ -1013,16 +1023,10 @@ export default async function handler(req, res) {
         } catch {}
       }
 
-      // IRPP: brut imposable = brutCotisable × (1 - 4% - 5%), annualisé puis régularisé
-      const brutImposableMensuel = brutCotisable * (1 - 0.04 - 0.05)
-      const revenuAnnuel = brutImposableMensuel * 12
-      const abattement = Math.min(revenuAnnuel, 10_000_000) * 0.28
-      const chargesFamille = pers * 10_000 * 12
-      const imposableAnnuel = Math.floor(Math.max(0, revenuAnnuel - abattement - chargesFamille) / 1000) * 1000
-      const irpp_base = Math.round(imposableAnnuel / 12)
+      const irpp_base = calc.imposableMensuel
 
-      const wb2 = new ExcelJS.Workbook()
-      genBulletin(wb2, `${(v.last_name||'').substring(0,3)} ${mois.substring(0,4)} ${v.period_year}`, {
+      const wb = new ExcelJS.Workbook()
+      genBulletin(wb, `${(v.last_name||'').substring(0,3)} ${mois.substring(0,4)} ${v.period_year}`, {
         nom: `${v.last_name} ${v.first_name}`,
         n_assure:          v.social_security_number || '',
         nif_employe:       v.nif_employe || v.employee_nif || '',
@@ -1034,7 +1038,11 @@ export default async function handler(req, res) {
         date_embauche:     v.hire_date ? new Date(v.hire_date).toLocaleDateString('fr-FR') : '',
         personnes_charge:  pers,
         rubriques,
-        avance_salaire:    v.avance_salaire || 0,
+        brut_cotisable:    brutCotisable,
+        autres_retenues: [
+          { label: 'Retenue avance sur salaire', montant: v.avance_salaire },
+          { label: 'Remboursement prêt',         montant: v.remboursement_pret },
+        ],
         irpp,
         irpp_base,
         logoBuffer,
@@ -1045,52 +1053,27 @@ export default async function handler(req, res) {
         period_month:      v.period_month,
         period_year:       v.period_year,
       })
-      // Archive bulletin: sauvegarder dans Vercel Blob si disponible
+      const fileBuffer = await wb.xlsx.writeBuffer()
+
+      // Archive du bulletin dans Vercel Blob, si configuré
       try {
         if (process.env.BLOB_READ_WRITE_TOKEN) {
-          const blobBuf = await wb2.xlsx.writeBuffer()
           const { put: blobPut } = await import('@vercel/blob')
           const blobResult = await blobPut(
             `bulletins/${auth.orgId}/${period_id}/${employee_id}_${mois}_${v.period_year}.xlsx`,
-            blobBuf,
+            fileBuffer,
             { access: 'public', token: process.env.BLOB_READ_WRITE_TOKEN }
           )
-          // Mettre à jour bulletin_url dans payroll_variables
           await db`UPDATE payroll_variables SET bulletin_url = ${blobResult.url} WHERE period_id = ${period_id} AND employee_id = ${employee_id}`
         }
       } catch (archiveErr) {
         console.warn('[bulletin-archive]', archiveErr.message)
       }
-      
-      // Regénérer le workbook pour le téléchargement (l'écriture précédente a consommé le stream)
-      const wb3 = new ExcelJS.Workbook()
-      genBulletin(wb3, `${(v.last_name||'').substring(0,3)} ${mois.substring(0,4)} ${v.period_year}`, {
-        nom: `${v.last_name} ${v.first_name}`,
-        n_assure:          v.social_security_number || '',
-        nif_employe:       v.nif_employe || v.employee_nif || '',
-        nif:               v.client_nif || '',
-        direction:         v.category || '',
-        poste:             v.position || '',
-        telephone:         v.phone || '',
-        telephone_client:  [v.client_phone, v.client_phone2].filter(Boolean).join('/') || '',
-        date_embauche:     v.hire_date ? new Date(v.hire_date).toLocaleDateString('fr-FR') : '',
-        personnes_charge:  pers,
-        rubriques,
-        avance_salaire:    v.avance_salaire || 0,
-        irpp,
-        irpp_base,
-        logoBuffer,
-        client_name:       v.client_name || '',
-        client_adresse:    [v.entite_name, v.address, v.bp ? `BP ${v.bp}` : ''].filter(Boolean).join(' '),
-        num_employeur:     v.num_employeur || '',
-        mois_label:        mois,
-        period_month:      v.period_month,
-        period_year:       v.period_year,
-      })
+
+      const safeName = `${v.last_name || 'employe'}_${mois}_${v.period_year}`.replace(/[^A-Za-z0-9_-]/g, '_')
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-      res.setHeader('Content-Disposition', `attachment; filename="Bulletin_${v.last_name}_${mois}_${v.period_year}.xlsx"`)
-      await wb3.xlsx.write(res)
-      return res.end()
+      res.setHeader('Content-Disposition', `attachment; filename="Bulletin_${safeName}.xlsx"`)
+      return res.status(200).send(Buffer.from(fileBuffer))
     }
 
     if (path === '/api/export-etat-charges') {
@@ -1110,25 +1093,21 @@ export default async function handler(req, res) {
         ORDER BY e.last_name
       `
       if (!rows.length) return res.status(404).json({ error: 'Aucune variable de paie pour cette période. Saisissez et enregistrez les variables dans Périodes de paie d\'abord.' })
-      const p = rows[0]
+      const p = normalizeRow(rows[0])
       const MOIS = ['JANVIER','FEVRIER','MARS','AVRIL','MAI','JUIN','JUILLET','AOUT','SEPTEMBRE','OCTOBRE','NOVEMBRE','DECEMBRE']
       const mois = MOIS[(p.period_month||1)-1]
-      const employes = rows.map(v => {
-        const brutCotisable = calcBrut(v) - (v.indemnite_grossesse || 0)
-        const brut = calcBrut(v)
-        const pers = calcPersonnesCharge(v.marital_status, v.children_count)
-        const irpp = calcIrppMensuel(brutCotisable, pers)
-        const net  = brut - Math.round(brutCotisable*0.04) - Math.round(brutCotisable*0.05) - irpp
-                   - (v.avance_salaire||0) - (v.remboursement_pret||0) - (v.deduction_forfaitaire||0)
+      const employes = rows.map(normalizeRow).map(v => {
+        const c = calcPayrollFromRow(v)
         return {
           nom: `${v.last_name} ${v.first_name}`,
           responsable: v.responsable || '',
           poste: v.position || '',
           pole: v.pole || '',
-          brut_imposable: brutCotisable,
-          irpp,
-          net_payer: Math.round(net),
-          regularisation_irpp: v.regularisation_irpp || 0,
+          brut: c.gross,
+          brut_imposable: c.cotisable,
+          irpp: c.irpp,
+          net_payer: c.net,
+          regularisation_irpp: n(v.regularisation_irpp),
         }
       })
       const suffix = avec_regularisation ? 'AVEC REGULARISATION' : 'SANS REGULARISATION'
@@ -1139,24 +1118,27 @@ export default async function handler(req, res) {
         employes, !!avec_regularisation)
       if (req.body.json) {
         const avecRegulFlag = !!avec_regularisation
-        const titleVal = `${p.client_name}: ETAT DES RETENUES ET SALAIRES NETS A PAYER ${mois} ${p.period_year}`
-        const jsonRows = employes.map((emp,i) => [
-          i+1, emp.nom, emp.responsable||'', emp.poste||'', emp.pole||'',
-          emp.brut_imposable||0, emp.brut_imposable||0,
-          Math.round((emp.brut_imposable||0)*0.04),
-          Math.round((emp.brut_imposable||0)*0.05),
-          Math.round((emp.brut_imposable||0)*0.175),
-          Math.round((emp.brut_imposable||0)*0.05),
-          emp.irpp||0,
-          ...(avecRegulFlag ? [emp.regularisation_irpp||0, (emp.irpp||0)+(emp.regularisation_irpp||0)] : []),
-          emp.net_payer||0,
-        ])
+        const titleVal = `${p.client_name}: ETAT DES RETENUES ET SALAIRES NETS A PAYER ${mois} ${p.period_year} ${suffix}`
+        const jsonRows = employes.map((emp, i) => {
+          const base    = n(emp.brut_imposable)
+          const cnssS   = Math.round(base * 0.04)
+          const amuS    = Math.round(base * 0.05)
+          const irpp    = n(emp.irpp)
+          const regul   = n(emp.regularisation_irpp)
+          const totalRet = cnssS + amuS + (avecRegulFlag ? irpp + regul : irpp)
+          return [
+            i + 1, emp.nom, emp.responsable || '', emp.poste || '', emp.pole || '',
+            n(emp.brut), base, cnssS, amuS, Math.round(base * 0.175), Math.round(base * 0.05), irpp,
+            ...(avecRegulFlag ? [regul, irpp + regul] : []),
+            totalRet, n(emp.net_payer),
+          ]
+        })
         return res.status(200).json({ title: titleVal, rows: jsonRows })
       }
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
       res.setHeader('Content-Disposition', `attachment; filename="Etat_Charges_${mois}_${p.period_year}.xlsx"`)
-      await wb2.xlsx.write(res)
-      return res.end()
+      const etatBuffer = await wb2.xlsx.writeBuffer()
+      return res.status(200).send(Buffer.from(etatBuffer))
     }
 
     if (path === '/api/export-bordereau-cnss') {
@@ -1182,24 +1164,23 @@ export default async function handler(req, res) {
               avance, preavis, inclure_preavis, retenues_arrierees, regularisation_irpp,
               retenue_sur_solde } = req.body
       const db = neon(DB_URL())
-      const [emp] = await db`SELECT e.*, c.name as client_name FROM employees e JOIN clients c ON c.id=e.client_id WHERE e.id=${employee_id} AND c.organization_id=${auth.orgId}`
-      if (!emp) return res.status(404).json({ error: 'Employé introuvable' })
+      const [empRaw] = await db`SELECT e.*, c.name as client_name FROM employees e JOIN clients c ON c.id=e.client_id WHERE e.id=${employee_id} AND c.organization_id=${auth.orgId}`
+      if (!empRaw) return res.status(404).json({ error: 'Employé introuvable' })
+      const emp = normalizeRow(empRaw)
       let vars = null
       if (period_id) {
         const vRows = await db`SELECT * FROM payroll_variables WHERE period_id=${period_id} AND employee_id=${employee_id}`
-        vars = vRows[0] || null
+        vars = vRows[0] ? normalizeRow(vRows[0]) : null
       }
-      const brutCotisable = vars ? calcBrut(vars) - (vars.indemnite_grossesse || 0) : 0
-      const brut = vars ? calcBrut(vars) : 0
-      const pers = calcPersonnesCharge(emp.marital_status, emp.children_count)
-      const irpp = calcIrppMensuel(brutCotisable, pers) + (regularisation_irpp||0)
+      const soldeCalc = vars ? calcPayrollFromRow({ ...vars, marital_status: emp.marital_status, children_count: emp.children_count }) : null
+      const brut = soldeCalc ? soldeCalc.gross : 0
+      const irpp = (soldeCalc ? soldeCalc.irpp : 0) + n(regularisation_irpp)
       const departDate = new Date(date_depart || Date.now())
       const hireDate   = emp.hire_date ? new Date(emp.hire_date) : null
       const ann = hireDate ? Math.floor((departDate-hireDate)/(1000*60*60*24*365)) : 0
       const fmt = d => d ? new Date(d).toLocaleDateString('fr-FR') : ''
 
-      const wb2 = new ExcelJS.Workbook()
-      genSolde(wb2, emp.last_name, {
+      const soldeData = {
         nom: `${emp.last_name} ${emp.first_name}`,
         client_nom: emp.client_name || '',
         depart: fmt(date_depart),
@@ -1211,57 +1192,48 @@ export default async function handler(req, res) {
         base_conges: brut,
         jours_conges_list: jours_conges_list || [],
         taux_conges_auto: taux_conges_auto !== false,
-        taux_conges_manuel: taux_conges_manuel || 0,
+        taux_conges_manuel: n(taux_conges_manuel),
         irpp,
-        avance: avance || 0,
-        preavis: preavis || 0,
+        avance: n(avance),
+        preavis: n(preavis),
         inclure_preavis: !!inclure_preavis,
-        retenues_arrierees: retenues_arrierees || 0,
-        retenue_sur_solde: retenue_sur_solde || 0,
-      })
-      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        retenues_arrierees: n(retenues_arrierees),
+        retenue_sur_solde: n(retenue_sur_solde),
+      }
+      const k = computeSolde(soldeData)
+
       if (req.body.json) {
-        // Recalculer toutes les valeurs localement
-        const jours = (jours_conges_list||[]).filter(j=>j[0]>0)
-        const tauxCongesCalc = taux_conges_auto !== false && jours.length
-          ? jours.reduce((s,j)=>s+(j[0]||0),0)/30
-          : (taux_conges_manuel||0)
-        const indCongesCalc = Math.round(brut * tauxCongesCalc)
-        const totalBrutCalc = brut + indCongesCalc
-        const basePrelevCalc = Math.max(0, totalBrutCalc - 140000)
-        const cnssCalc = Math.round(basePrelevCalc * 0.04)
-        const amuCalc  = Math.round(basePrelevCalc * 0.05)
-        const irppCalc = irpp
-        const totalRetCalc = cnssCalc + amuCalc + irppCalc + (retenues_arrierees||0)
-        const netSoldeCalc = totalBrutCalc - totalRetCalc
-        const moisLabel = departDate.toLocaleDateString('fr-FR',{month:'long'}).toUpperCase()
-        const netFinalCalc = netSoldeCalc - (avance||0) - (retenue_sur_solde||0) - (inclure_preavis?0:(preavis||0))
         return res.status(200).json({
           title: `${emp.last_name} ${emp.first_name} : SOLDE DE TOUT COMPTE`,
-          depart: fmt(date_depart),
+          depart: soldeData.depart,
           embauche: emp.hire_date ? fmt(emp.hire_date) : '',
-          fin_contrat: fmt(date_fin_contrat || date_depart),
-          anciennete: ann <= 0 ? '0 an' : ann === 1 ? '1 an' : `${ann} ans`,
-          net_payer: netFinalCalc,
+          fin_contrat: soldeData.fin_contrat,
+          anciennete: soldeData.anciennete_label,
+          net_payer: k.netFinal,
           lignes: [
-            { label: `SALAIRE MOIS DE ${moisLabel}`, montant: brut },
-            { label: 'INDEMNITE DE CONGES ACQUIS NON JOUIR', base: brut, taux: tauxCongesCalc.toFixed(4), montant: indCongesCalc },
-            { label: 'TOTAL BRUT SOLDE DE TOUT COMPTE', montant: totalBrutCalc },
-            { label: 'CNSS (4%)', base: basePrelevCalc, taux: '4%', montant: cnssCalc },
-            { label: 'AMU (5%)', base: basePrelevCalc, taux: '5%', montant: amuCalc },
-            { label: 'IRPP', montant: irppCalc },
-            ...(retenues_arrierees ? [{ label: 'RETENUES ARRIEREES', montant: retenues_arrierees }] : []),
-            { label: 'TOTAL DES RETENUES', montant: totalRetCalc },
-            { label: 'SALAIRE NET SOLDE DE TOUT COMPTE', montant: netSoldeCalc },
-            ...(inclure_preavis ? [{ label: 'MONTANT DU PREAVIS', montant: preavis||0 }] : []),
-            { label: 'AVANCE SUR SOLDE DE TOUT COMPTE', montant: avance||0 },
-            ...(retenue_sur_solde ? [{ label: 'RETENUE SUR SOLDE DE TOUT COMPTE', montant: retenue_sur_solde }] : []),
+            { label: soldeData.salaire_mois_label, montant: k.salaireMois },
+            { label: 'INDEMNITE DE CONGES ACQUIS NON JOUIR', base: k.baseConges, taux: k.taux.toFixed(4), montant: k.indConges },
+            { label: 'TOTAL BRUT SOLDE DE TOUT COMPTE', montant: k.totalBrut },
+            { label: 'CNSS (4%)', base: k.baseCot, taux: '4%', montant: k.cnss },
+            { label: 'AMU (5%)', base: k.baseCot, taux: '5%', montant: k.amu },
+            { label: 'IRPP', montant: k.irpp },
+            ...(k.arrieres ? [{ label: 'RETENUES ARRIEREES', montant: k.arrieres }] : []),
+            { label: 'TOTAL DES RETENUES', montant: k.totalRet },
+            { label: 'SALAIRE NET SOLDE DE TOUT COMPTE', montant: k.netSolde },
+            ...(k.preavis ? [{ label: 'MONTANT DU PREAVIS', montant: k.preavis }] : []),
+            { label: 'AVANCE SUR SOLDE DE TOUT COMPTE', montant: k.avance },
+            ...(k.retSolde ? [{ label: 'RETENUE SUR SOLDE DE TOUT COMPTE', montant: k.retSolde }] : []),
           ],
         })
       }
-      res.setHeader('Content-Disposition', `attachment; filename="Solde_${emp.last_name}_${fmt(date_depart).replace(/\//g,'-')}.xlsx"`)
-      await wb2.xlsx.write(res)
-      return res.end()
+
+      const wb = new ExcelJS.Workbook()
+      genSolde(wb, (emp.last_name || 'Solde').substring(0, 31).replace(/[\\/?*\[\]:]/g, ' '), soldeData)
+      const fileBuffer = await wb.xlsx.writeBuffer()
+      const safeDate = fmt(date_depart).replace(/\//g, '-')
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+      res.setHeader('Content-Disposition', `attachment; filename="Solde_${(emp.last_name || 'employe').replace(/[^A-Za-z0-9_-]/g, '_')}_${safeDate}.xlsx"`)
+      return res.status(200).send(Buffer.from(fileBuffer))
     }
 
     // ── Paramètres ────────────────────────────────────────────────────────────
@@ -1431,7 +1403,9 @@ export default async function handler(req, res) {
         if (!(await ownsPeriod(sql, b.period_id, auth.orgId))) return res.status(403).json({ error:'Accès refusé' })
         const emp=await sql('SELECT 1 FROM employees e JOIN payroll_periods pp ON pp.client_id=e.client_id WHERE e.id=$1 AND pp.id=$2',[b.employee_id,b.period_id])
         if (!emp.rows.length) return res.status(403).json({ error:'Accès refusé' })
-        const values=pick(b, VARIABLE_COLUMNS); const keys=Object.keys(values)
+        const values=pick(b, VARIABLE_COLUMNS)
+        if ('indemnites_perso' in values) values.indemnites_perso = JSON.stringify(parseCustomAllowances(values.indemnites_perso))
+        const keys=Object.keys(values)
         const ex=await sql('SELECT id FROM payroll_variables WHERE period_id=$1 AND employee_id=$2',[b.period_id,b.employee_id])
         let r
         if (ex.rows.length) {
@@ -1550,6 +1524,9 @@ function genBordereauCNSS(wb, sheetName, title, employes, mois, annee) {
   const ws = wb.addWorksheet(sheetName)
   ws.pageSetup.orientation = 'landscape'
   ws.pageSetup.paperSize = 9
+  ws.pageSetup.fitToPage = true
+  ws.pageSetup.fitToWidth = 1
+  ws.pageSetup.fitToHeight = 0
 
   const col_widths = [6, 35, 15, 15, 15, 15, 15, 15, 15]
   col_widths.forEach((w, i) => ws.getColumn(i+1).width = w)
@@ -1559,7 +1536,7 @@ function genBordereauCNSS(wb, sheetName, title, employes, mois, annee) {
   const t = ws.getCell('A1')
   t.value = title
   t.font = { name:'Calibri', size:14, bold:true }
-  t.alignment = { horizontal:'center', vertical:'center' }
+  t.alignment = { horizontal:'center', vertical:'middle' }
   ws.getRow(1).height = 24
 
   // Sous-titre
@@ -1575,16 +1552,17 @@ function genBordereauCNSS(wb, sheetName, title, employes, mois, annee) {
     const c = ws.getRow(4).getCell(ci)
     c.value = headers[ci-1]
     c.font = { name:'Calibri', size:10, bold:true, color:{argb:'FFFFFFFF'} }
-    c.alignment = { horizontal:'center', vertical:'center', wrapText:true }
+    c.alignment = { horizontal:'center', vertical:'middle', wrapText:true }
     c.fill = hFill
     c.border = { left:{style:'thin'}, right:{style:'thin'}, top:{style:'thin'}, bottom:{style:'thin'} }
   }
   ws.getRow(4).height = 35
 
   // Données
+  const sums = {}
   for (let i=0; i<employes.length; i++) {
     const r = i+5; const emp = employes[i]
-    const brut = emp.brut
+    const brut = n(emp.brut_cotisable != null ? emp.brut_cotisable : emp.brut)
     const cnss_s = Math.round(brut * 0.04)
     const cnss_p = Math.round(brut * 0.175)
     const amu_s  = Math.round(brut * 0.05)
@@ -1596,8 +1574,9 @@ function genBordereauCNSS(wb, sheetName, title, employes, mois, annee) {
       const c = ws.getRow(r).getCell(ci)
       c.value = vals[ci-1]
       c.font = { name:'Calibri', size:10 }
+      c.alignment = { horizontal: ci === 1 ? 'center' : 'left', vertical:'middle' }
       c.border = { left:{style:'thin'}, right:{style:'thin'}, top:{style:'thin'}, bottom:{style:'thin'} }
-      if (ci >= 4) c.numFmt = '#,##0'
+      if (ci >= 4) { c.numFmt = '#,##0'; c.alignment = { horizontal:'right', vertical:'middle' }; sums[ci] = (sums[ci] || 0) + vals[ci-1] }
     }
   }
 
@@ -1608,7 +1587,7 @@ function genBordereauCNSS(wb, sheetName, title, employes, mois, annee) {
   for (let ci=4; ci<=9; ci++) {
     const lc = String.fromCharCode(64+ci)
     const c = ws.getRow(tr).getCell(ci)
-    c.value = { formula: `SUM(${lc}5:${lc}${tr-1})` }
+    c.value = employes.length ? { formula: `SUM(${lc}5:${lc}${tr-1})`, result: sums[ci] || 0 } : 0
     c.font = { name:'Calibri', size:11, bold:true }
     c.numFmt = '#,##0'
     c.border = { left:{style:'thin'}, right:{style:'thin'}, top:{style:'medium'}, bottom:{style:'medium'} }
@@ -1626,6 +1605,9 @@ function genDeclarationIRPP(wb, sheetName, title, employes, trimestre, annee) {
   const ws = wb.addWorksheet(sheetName)
   ws.pageSetup.orientation = 'landscape'
   ws.pageSetup.paperSize = 9
+  ws.pageSetup.fitToPage = true
+  ws.pageSetup.fitToWidth = 1
+  ws.pageSetup.fitToHeight = 0
 
   ws.getColumn(1).width = 6
   ws.getColumn(2).width = 35
@@ -1652,21 +1634,23 @@ function genDeclarationIRPP(wb, sheetName, title, employes, trimestre, annee) {
     const c = ws.getRow(4).getCell(ci)
     c.value = headers[ci-1]
     c.font = { name:'Calibri', size:10, bold:true, color:{argb:'FFFFFFFF'} }
-    c.alignment = { horizontal:'center', vertical:'center', wrapText:true }
+    c.alignment = { horizontal:'center', vertical:'middle', wrapText:true }
     c.fill = hFill
     c.border = { left:{style:'thin'}, right:{style:'thin'}, top:{style:'thin'}, bottom:{style:'thin'} }
   }
   ws.getRow(4).height = 35
 
+  const sums = {}
   for (let i=0; i<employes.length; i++) {
     const r = i+5; const emp = employes[i]
-    const vals = [i+1, emp.nom, emp.brut_imposable||0, emp.irpp||0, emp.regularisation||0, (emp.irpp||0)+(emp.regularisation||0)]
+    const vals = [i+1, emp.nom, n(emp.brut_imposable), n(emp.irpp), n(emp.regularisation), n(emp.irpp)+n(emp.regularisation)]
     for (let ci=1; ci<=6; ci++) {
       const c = ws.getRow(r).getCell(ci)
       c.value = vals[ci-1]
       c.font = { name:'Calibri', size:10 }
+      c.alignment = { horizontal: ci === 1 ? 'center' : 'left', vertical:'middle' }
       c.border = { left:{style:'thin'}, right:{style:'thin'}, top:{style:'thin'}, bottom:{style:'thin'} }
-      if (ci >= 3) c.numFmt = '#,##0'
+      if (ci >= 3) { c.numFmt = '#,##0'; c.alignment = { horizontal:'right', vertical:'middle' }; sums[ci] = (sums[ci] || 0) + vals[ci-1] }
     }
   }
 
@@ -1676,7 +1660,7 @@ function genDeclarationIRPP(wb, sheetName, title, employes, trimestre, annee) {
   for (let ci=3; ci<=6; ci++) {
     const lc = String.fromCharCode(64+ci)
     const c = ws.getRow(tr).getCell(ci)
-    c.value = { formula: `SUM(${lc}5:${lc}${tr-1})` }
+    c.value = employes.length ? { formula: `SUM(${lc}5:${lc}${tr-1})`, result: sums[ci] || 0 } : 0
     c.font = { name:'Calibri', size:11, bold:true }
     c.numFmt = '#,##0'
     c.border = { left:{style:'thin'}, right:{style:'thin'}, top:{style:'medium'}, bottom:{style:'medium'} }
@@ -1685,7 +1669,7 @@ function genDeclarationIRPP(wb, sheetName, title, employes, trimestre, annee) {
 
 // ─── ROUTES EXPORT BORDEREAU + IRPP ──────────────────────────────────────────
 async function handleExportBordereau(req, res, type) {
-  await requireAuth(req)
+  const auth = await requireAuth(req)
   const { period_id } = req.body
   if (!period_id) return res.status(400).json({ error: 'period_id requis' })
   const db = neon(DB_URL())
@@ -1697,23 +1681,24 @@ async function handleExportBordereau(req, res, type) {
     JOIN employees e ON e.id = pv.employee_id
     JOIN payroll_periods pp ON pp.id = pv.period_id
     JOIN clients c ON c.id = pp.client_id
-    WHERE pv.period_id = ${period_id}
+    WHERE pv.period_id = ${period_id} AND c.organization_id = ${auth.orgId}
     ORDER BY e.last_name
   `
   if (!rows.length) return res.status(404).json({ error: 'Aucune variable de paie pour cette période.' })
-  const p = rows[0]
+  const p = normalizeRow(rows[0])
   const MOIS = ['JANVIER','FEVRIER','MARS','AVRIL','MAI','JUIN','JUILLET','AOUT','SEPTEMBRE','OCTOBRE','NOVEMBRE','DECEMBRE']
   const mois = MOIS[(p.period_month||1)-1]
   const annee = p.period_year || ''
-  const employes = rows.map(v => {
-    const brutCotisable = calcBrut(v) - (v.indemnite_grossesse || 0)
+  const employes = rows.map(normalizeRow).map(v => {
+    const c = calcPayrollFromRow(v)
     return {
       nom: `${v.last_name} ${v.first_name}`,
       n_assure: v.social_security_number || '',
-      brut: calcBrut(v),
-      brut_imposable: Math.round(brutCotisable * 0.91),
-      irpp: calcIrppMensuel(brutCotisable, calcPersonnesCharge(v.marital_status, v.children_count)),
-      regularisation: v.regularisation_irpp || 0,
+      brut: c.gross,
+      brut_cotisable: c.cotisable,
+      brut_imposable: c.cotisable - c.cnss - c.amu,
+      irpp: c.irpp,
+      regularisation: n(v.regularisation_irpp),
     }
   })
 
@@ -1730,8 +1715,8 @@ async function handleExportBordereau(req, res, type) {
 
   res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
   res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
-  await wb2.xlsx.write(res)
-  return res.end()
+  const bordereauBuffer = await wb2.xlsx.writeBuffer()
+  return res.status(200).send(Buffer.from(bordereauBuffer))
 }
 
 // ─── SALARY GRID SUGGESTION ───────────────────────────────────────────────────

@@ -54,9 +54,11 @@ export default function AuthPage() {
 
   return (
     <div className="min-h-screen flex bg-white">
-      <aside className="hidden lg:flex lg:w-[44%] flex-col justify-between bg-primary-800 text-white p-12">
-        <Logo size={32} light />
-        <div>
+      <aside className="relative hidden lg:flex lg:w-[44%] flex-col justify-between bg-primary-800 text-white p-12 overflow-hidden">
+        <img src="/auth-bg.jpg" alt="" aria-hidden className="absolute inset-0 w-full h-full object-cover object-[35%_center] opacity-25 mix-blend-luminosity" />
+        <div className="absolute inset-0 bg-primary-800/70" aria-hidden />
+        <div className="relative"><Logo size={32} light /></div>
+        <div className="relative">
           <h2 className="text-3xl font-semibold leading-tight tracking-tight max-w-md">
             {t('Gestion de paie multi-client pour cabinets comptables au Togo')}
           </h2>
@@ -64,7 +66,7 @@ export default function AuthPage() {
             {features.map(f => <li key={f}>{f}</li>)}
           </ul>
         </div>
-        <p className="text-xs text-primary-200">{t('Conforme CGI OTR 2025 · Code du Travail Togo 2021')}</p>
+        <p className="relative text-xs text-primary-200">{t('Conforme CGI OTR 2025 · Code du Travail Togo 2021')}</p>
       </aside>
 
       <main className="flex-1 flex flex-col">

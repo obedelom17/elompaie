@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
-import { formatXOF, MONTH_NAMES, PayrollResult } from './payroll'
+import { MONTH_NAMES, PayrollResult } from './payroll'
+import { pdfNum, pdfXOF as formatXOF, loadImageAsPng } from './format'
 
 interface BulletinData {
   employee: any; period: any; variables: any; result: PayrollResult
@@ -16,8 +17,7 @@ const C_DGRAY : [number,number,number] = [217, 217, 217]
 const C_BLUE  : [number,number,number] = [217, 225, 242]
 
 function fmt(v: number): string {
-  if (!v) return '0'
-  return Math.round(v).toLocaleString('fr-FR').replace(/\u202f/g, ' ')
+  return pdfNum(v || 0)
 }
 
 export async function generateBulletinPDF(data: BulletinData): Promise<jsPDF> {
@@ -44,14 +44,11 @@ export async function generateBulletinPDF(data: BulletinData): Promise<jsPDF> {
   const logoW = 48; const logoH = 24
   let y = 8
   if (client.logo_url) {
-    try {
-      const resp = await fetch(client.logo_url)
-      const blob = await resp.blob()
-      const dataUrl = await new Promise<string>(res => {
-        const r = new FileReader(); r.onload = () => res(r.result as string); r.readAsDataURL(blob)
-      })
-      doc.addImage(dataUrl, 'PNG', ML, y, logoW, logoH, '', 'FAST')
-    } catch {}
+    const img = await loadImageAsPng(client.logo_url)
+    if (img) {
+      const ratio = Math.min(logoW / img.width, logoH / img.height)
+      doc.addImage(img.dataUrl, 'PNG', ML, y, img.width * ratio, img.height * ratio, '', 'FAST')
+    }
   }
 
   // ── BULLETIN DE PAIE — fond gris, texte rouge ──────────────────────────────
@@ -84,7 +81,7 @@ export async function generateBulletinPDF(data: BulletinData): Promise<jsPDF> {
   const entiteName = client.entite_name || client.name || ''
   doc.text(`Entité: ${entiteName}`, W / 2, y + 4.5, { align: 'center' })
   doc.setFontSize(8.5)
-  const adresse = [client.address, client.bp ? `05 BP ${client.bp}` : ''].filter(Boolean).join('  ')
+  const adresse = [client.address, client.bp ? `BP ${client.bp}` : ''].filter(Boolean).join('  ')
   doc.text(adresse, W / 2, y + 8.5, { align: 'center' })
   y += 10
 
@@ -102,7 +99,7 @@ export async function generateBulletinPDF(data: BulletinData): Promise<jsPDF> {
 
   // ── Infos employé ──────────────────────────────────────────────────────────
   doc.setDrawColor(180,180,180); doc.setLineWidth(0.2)
-  doc.rect(ML, y, TW, 34)
+  doc.rect(ML, y, TW, 38)
   doc.setTextColor(...C_BLACK)
   const lx = ML + 36; const vx = ML + 38
   let iy = y + 5.5
@@ -125,7 +122,7 @@ export async function generateBulletinPDF(data: BulletinData): Promise<jsPDF> {
   infoLine("Date d'embauche:", (emp.hire_date || emp.date_embauche) ? new Date(emp.hire_date || emp.date_embauche).toLocaleDateString('fr-FR') : '')
   doc.setFont('helvetica', 'bold'); doc.text('Pers à charge', lx, iy, { align: 'right' })
   doc.setFont('helvetica', 'normal'); doc.text(String(emp.children_count ?? emp.personnes_charge ?? 0), vx, iy)
-  y += 34
+  y += 38
 
   // ── Header tableau ─────────────────────────────────────────────────────────
   // Colonnes: Code | Rubriques | Base | Taux/NB | Retenues | Gains
@@ -169,10 +166,12 @@ export async function generateBulletinPDF(data: BulletinData): Promise<jsPDF> {
     { label: 'Indemnité de Transport',     base: variables.transport_allowance   || 0 },
     { label: 'Indemnité de repas',         base: variables.meal_premium          || 0 },
     { label: 'Indemnité de communication', base: variables.communication_allowance|| 0 },
+    ...((variables.custom_allowances || []) as { label: string; amount: number; cotisable?: boolean }[])
+      .map(a => ({ label: a.label + (a.cotisable === false ? ' (exo.)' : ''), base: a.amount })),
   ]
 
   doc.setFont('helvetica', 'normal'); doc.setFontSize(8)
-  for (const rub of rubriques) {
+  for (const rub of rubriques.filter(r => r.base > 0 || r.label === 'Salaire de Base')) {
     doc.setDrawColor(200,200,200); doc.setLineWidth(0.15)
     doc.rect(ML, y, TW, rH)
     ;[cols.rubX, cols.baseX, cols.tauxX, cols.retX, cols.gainX, MR].forEach(x => {
@@ -200,8 +199,8 @@ export async function generateBulletinPDF(data: BulletinData): Promise<jsPDF> {
 
   // ── CNSS / AMU / IRPP ─────────────────────────────────────────────────────
   const cotisations = [
-    { label: 'CNSS',  base: result.gross_salary, taux: '0,04', ret: result.cnss_employee },
-    { label: 'AMU',   base: result.gross_salary, taux: '0,05', ret: result.amu_employee  },
+    { label: 'CNSS',  base: result.gross_salary_cotisable, taux: '4 %', ret: result.cnss_employee },
+    { label: 'AMU',   base: result.gross_salary_cotisable, taux: '5 %', ret: result.amu_employee  },
     { label: 'IRPP',  base: result.taxable_income_monthly || 0, taux: '', ret: result.irpp_net },
   ]
   doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(...C_BLACK)
@@ -245,27 +244,31 @@ export async function generateBulletinPDF(data: BulletinData): Promise<jsPDF> {
   doc.text(fmt(netLegal), cols.gainX + cols.gainW, y + 3.7, { align: 'right' })
   y += rH
 
-  // ── Retenue avance ─────────────────────────────────────────────────────────
-  const advance = variables.salary_advance || (variables as any).avance_salaire || 0
-  doc.setDrawColor(200,200,200); doc.setLineWidth(0.15)
-  doc.rect(ML, y, TW, rH)
-  ;[cols.rubX, cols.baseX, cols.tauxX, cols.retX, cols.gainX, MR].forEach(x => {
-    doc.line(x, y, x, y + rH)
-  })
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(8)
-  doc.text('Retenue avance sur salaire', cols.rubX + 1, y + 3.5)
-  if (advance > 0) doc.text(fmt(advance), cols.retX + cols.retW, y + 3.5, { align: 'right' })
-  y += rH
+  // ── Autres retenues : avance sur salaire et remboursement de prêt ───────────
+  const advance = Number(variables.salary_advance || (variables as any).avance_salaire || 0)
+  const loan    = Number(variables.loan_payment   || (variables as any).remboursement_pret || 0)
+  const autres  = [
+    { label: 'Retenue avance sur salaire', value: advance },
+    { label: 'Remboursement prêt',         value: loan    },
+  ].filter(r => r.value > 0)
+  if (autres.length === 0) autres.push({ label: 'Retenue avance sur salaire', value: 0 })
+  for (const r of autres) {
+    doc.setDrawColor(200,200,200); doc.setLineWidth(0.15)
+    doc.rect(ML, y, TW, rH)
+    ;[cols.rubX, cols.baseX, cols.tauxX, cols.retX, cols.gainX, MR].forEach(x => { doc.line(x, y, x, y + rH) })
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8)
+    doc.text(r.label, cols.rubX + 1, y + 3.5)
+    if (r.value > 0) doc.text(fmt(r.value), cols.retX + cols.retW, y + 3.5, { align: 'right' })
+    y += rH
+  }
 
   // ── Total Autres retenues ──────────────────────────────────────────────────
   doc.setDrawColor(160,160,160); doc.setLineWidth(0.25)
   doc.rect(ML, y, TW, rH)
-  ;[cols.rubX, cols.baseX, cols.tauxX, cols.retX, cols.gainX, MR].forEach(x => {
-    doc.line(x, y, x, y + rH)
-  })
+  ;[cols.rubX, cols.baseX, cols.tauxX, cols.retX, cols.gainX, MR].forEach(x => { doc.line(x, y, x, y + rH) })
   doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5)
   doc.text('Total Autres retenues', cols.rubX + 1, y + 3.7)
-  if (advance > 0) doc.text(fmt(advance), cols.retX + cols.retW, y + 3.7, { align: 'right' })
+  if (advance + loan > 0) doc.text(fmt(advance + loan), cols.retX + cols.retW, y + 3.7, { align: 'right' })
   y += rH
 
   // ── NET A PAYER — fond bleu clair ──────────────────────────────────────────
@@ -395,7 +398,7 @@ export function generateBordereauAMU(period: any, variables: any[], orgName: str
 }
 
 // ── Déclaration IRPP ───────────────────────────────────────────────────────────
-export function generateDeclarationIRPP(periods: any[], variables: any[], orgName: string, quarter: number, year: number) {
+export function generateDeclarationIRPP(_periods: any[], variables: any[], orgName: string, quarter: number, year: number) {
   const doc = new jsPDF('landscape'); const pw = doc.internal.pageSize.getWidth()
   doc.setFillColor(124, 58, 237); doc.rect(0, 0, pw, 18, 'F')
   doc.setTextColor(255,255,255); doc.setFontSize(12); doc.setFont('helvetica', 'bold')
@@ -440,36 +443,38 @@ export async function pdfToImagePng(doc: jsPDF, filename: string, scale = 2): Pr
   ).toString()
 
   const pdfDoc2 = await pdfjsLib.getDocument({ url: pdfUrl }).promise
-  const images: string[] = []
+  const canvases: HTMLCanvasElement[] = []
 
   for (let i = 1; i <= pdfDoc2.numPages; i++) {
     const page     = await pdfDoc2.getPage(i)
     const viewport = page.getViewport({ scale })
     const canvas   = document.createElement('canvas')
-    canvas.width   = viewport.width
-    canvas.height  = viewport.height
+    canvas.width   = Math.ceil(viewport.width)
+    canvas.height  = Math.ceil(viewport.height)
     const ctx = canvas.getContext('2d')!
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
     await page.render({ canvasContext: ctx, viewport, canvas }).promise
-    images.push(canvas.toDataURL('image/png'))
+    canvases.push(canvas)
   }
 
   URL.revokeObjectURL(pdfUrl)
 
-  if (images.length === 1) {
-    // Une seule page → PNG direct
-    const a = document.createElement('a')
-    a.href     = images[0]
-    a.download = filename
-    a.click()
-  } else {
-    // Plusieurs pages → PNG par page
-    images.forEach((img, idx) => {
-      const a = document.createElement('a')
-      a.href     = img
-      a.download = filename.replace('.png', `_page${idx + 1}.png`)
-      a.click()
-    })
-  }
+  // Toutes les pages sont assemblées en une seule image : plusieurs téléchargements
+  // simultanés sont bloqués par la plupart des navigateurs.
+  const out = document.createElement('canvas')
+  out.width  = Math.max(...canvases.map(c => c.width))
+  out.height = canvases.reduce((sum, c) => sum + c.height, 0)
+  const octx = out.getContext('2d')!
+  octx.fillStyle = '#ffffff'
+  octx.fillRect(0, 0, out.width, out.height)
+  let offset = 0
+  for (const c of canvases) { octx.drawImage(c, 0, offset); offset += c.height }
+
+  const a = document.createElement('a')
+  a.href = out.toDataURL('image/png')
+  a.download = filename
+  a.click()
 }
 
 // Wrapper: générer bulletin puis exporter en format demandé

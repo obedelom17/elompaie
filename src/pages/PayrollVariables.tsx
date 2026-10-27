@@ -7,7 +7,7 @@ import { t, monthName } from '../lib/i18n'
 
 interface Employee { id: string; first_name: string; last_name: string; matricule: string|null; position: string|null; category: string|null; marital_status: string; children_count: number; client_id: string; email: string|null; phone: string|null; social_security_number: string|null; hire_date: string|null; client_name?: string }
 
-const EMPTY_VARS = { base_salary: 0, seniority_allowance: 0, custom_allowances: [] as CustomAllowance[], overtime_premium: 0, function_allowance: 0, communication_allowance: 0, housing_premium: 0, meal_premium: 0, transport_allowance: 0, salary_advance: 0, loan_payment: 0, flat_deduction: 0, indemnite_grossesse: 0 }
+const EMPTY_VARS = { base_salary: 0, seniority_allowance: 0, custom_allowances: [] as CustomAllowance[], round_taxable_income: false, overtime_premium: 0, function_allowance: 0, communication_allowance: 0, housing_premium: 0, meal_premium: 0, transport_allowance: 0, salary_advance: 0, loan_payment: 0, flat_deduction: 0, indemnite_grossesse: 0 }
 
 export default function PayrollVariables() {
   const { periodId } = useParams<{ periodId: string }>()
@@ -66,6 +66,7 @@ export default function PayrollVariables() {
     base_salary:             Number(row.base_salary)            || 0,
     seniority_allowance:     Number(row.indemnite_anciennete)   || 0,
     custom_allowances:       parseCustom(row.indemnites_perso),
+    round_taxable_income:    row.arrondi_imposable === true,
     overtime_premium:        Number(row.sursalaire)             || 0,
     function_allowance:      Number(row.indemnite_fonction)     || 0,
     communication_allowance: Number(row.indemnite_communication)|| 0,
@@ -92,7 +93,7 @@ export default function PayrollVariables() {
       setForm(f)
       setResult(calculatePayroll(buildInput(f, emp)))
     } else {
-      setForm({ ...EMPTY_VARS })
+      setForm({ ...EMPTY_VARS, round_taxable_income: localStorage.getItem('elompaie.roundTaxable') === '1' })
       setResult(null)
     }
   }
@@ -120,6 +121,7 @@ export default function PayrollVariables() {
       indemnite_transport: form.transport_allowance || 0,
       indemnite_anciennete: form.seniority_allowance || 0,
       indemnites_perso: form.custom_allowances.filter(a => a.label.trim() && a.amount > 0),
+      arrondi_imposable: form.round_taxable_income,
       avance_salaire: form.salary_advance || 0,
       remboursement_pret: form.loan_payment || 0,
       deduction_forfaitaire: form.flat_deduction || 0,
@@ -308,6 +310,16 @@ export default function PayrollVariables() {
                     </button>
                   </section>
                 </div>
+
+                <label className="flex items-start gap-3 mt-6 p-3 rounded-md border border-slate-200 bg-slate-50 cursor-pointer select-none">
+                  <input type="checkbox" disabled={isClosed} checked={form.round_taxable_income}
+                    onChange={e => { localStorage.setItem('elompaie.roundTaxable', e.target.checked ? '1' : '0'); setForm({ ...form, round_taxable_income: e.target.checked }) }}
+                    className="h-4 w-4 mt-0.5 rounded border-slate-300" />
+                  <span>
+                    <span className="block text-sm font-medium text-slate-800">{t("Arrondir le revenu imposable")}</span>
+                    <span className="block text-xs text-slate-500 mt-0.5">{t("Le revenu imposable mensuel est arrondi au millier inférieur avant le calcul de l'IRPP (204 333 devient 204 000).")}</span>
+                  </span>
+                </label>
 
                 <div className="flex gap-3 mt-6">
                   <button onClick={handleCalculate} disabled={isClosed||calculating} className="btn-primary">

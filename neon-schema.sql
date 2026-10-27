@@ -90,6 +90,7 @@ CREATE TABLE IF NOT EXISTS payroll_variables (
   indemnite_transport NUMERIC DEFAULT 0,
   indemnite_anciennete NUMERIC DEFAULT 0,
   indemnites_perso JSONB DEFAULT '[]'::jsonb,
+  arrondi_imposable BOOLEAN DEFAULT FALSE,
   avance_salaire NUMERIC DEFAULT 0,
   remboursement_pret NUMERIC DEFAULT 0,
   deduction_forfaitaire NUMERIC DEFAULT 0,

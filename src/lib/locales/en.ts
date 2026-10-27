@@ -481,6 +481,9 @@ const en: Record<string, string> = {
   'Soumise aux cotisations': 'Subject to contributions',
   'Ajouter une indemnité': 'Add an allowance',
 
+  'Arrondir le revenu imposable': 'Round taxable income',
+  "Le revenu imposable mensuel est arrondi au millier inférieur avant le calcul de l'IRPP (204 333 devient 204 000).": 'Monthly taxable income is rounded down to the nearest thousand before income tax is computed (204,333 becomes 204,000).',
+
   // Langue
   'Langue': 'Language',
   'Passer en anglais': 'Switch to English',

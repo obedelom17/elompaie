@@ -152,6 +152,7 @@ export default function ExportReports() {
       marital_status:            emp.marital_status  || vars.marital_status  || 'celibataire',
       children_count:            Number(emp.children_count ?? vars.children_count)            || 0,
       indemnite_grossesse:       Number(vars.indemnite_grossesse) || 0,
+      round_taxable_income:      vars.arrondi_imposable === true,
       custom_allowances:         (Array.isArray(vars.indemnites_perso) ? vars.indemnites_perso : [])
         .map((a: any) => ({ label: String(a.label || ''), amount: Number(a.amount) || 0, cotisable: a.cotisable !== false }))
         .filter((a: any) => a.label && a.amount > 0),

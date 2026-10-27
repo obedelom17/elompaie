@@ -17,6 +17,7 @@ export interface PayrollInput {
   meal_premium: number
   transport_allowance: number
   custom_allowances?: CustomAllowance[]   // Indemnités personnalisées
+  round_taxable_income?: boolean          // Arrondir le revenu imposable mensuel au millier inférieur
   seniority_allowance?: number   // Indemnité d'ancienneté (soumise CNSS/AMU/IRPP)
   thirteenth_month?: number      // 13ème mois
   exceptional_bonus?: number     // prime exceptionnelle
@@ -160,7 +161,11 @@ export function calculatePayroll(input: PayrollInput): PayrollResult {
   const charges_famille  = personnes * 10_000
 
   // Revenu imposable annuel arrondi à la tranche de 1 000
-  const revImposable = Math.floor(Math.max(0, revApresAbat - chargesFamAnnual) / 1000) * 1000
+  let revImposable = Math.floor(Math.max(0, revApresAbat - chargesFamAnnual) / 1000) * 1000
+  if (input.round_taxable_income) {
+    // Option : le revenu imposable mensuel est arrondi au millier inférieur (204 333 devient 204 000)
+    revImposable = Math.floor(Math.round(revImposable / 12) / 1000) * 1000 * 12
+  }
   const irpp_annuel   = calcItsBrutAnnual(revImposable)
   const irpp_net      = Math.round(irpp_annuel / 12)
   const irpp_brut     = irpp_net

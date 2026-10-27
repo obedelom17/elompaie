@@ -107,6 +107,14 @@ export default function Simulator() {
                 ))}
               </div>
 
+              <label className="flex items-start gap-3 mt-4 p-3 rounded-md border border-slate-200 bg-slate-50 cursor-pointer select-none">
+                <input type="checkbox" checked={!!form.round_taxable_income} onChange={e => f('round_taxable_income', e.target.checked)} className="h-4 w-4 mt-0.5 rounded border-slate-300" />
+                <span>
+                  <span className="block text-sm font-medium text-slate-800">{t("Arrondir le revenu imposable")}</span>
+                  <span className="block text-xs text-slate-500 mt-0.5">{t("Le revenu imposable mensuel est arrondi au millier inférieur avant le calcul de l'IRPP (204 333 devient 204 000).")}</span>
+                </span>
+              </label>
+
               <button onClick={() => setShowAdvanced(!showAdvanced)}
                 className="mt-4 flex items-center gap-2 text-sm text-slate-500 hover:text-primary-600 transition-colors">
                 {showAdvanced ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
@@ -287,6 +295,13 @@ export default function Simulator() {
                     <input type="number" min="0" value={fm.function_allowance === 0 ? '' : fm.function_allowance} placeholder="0" onChange={e => setF('function_allowance', Number(e.target.value))} className="input" />
                   </div>
                 </div>
+                <label className="flex items-start gap-3 mt-4 p-3 rounded-md border border-slate-200 bg-slate-50 cursor-pointer select-none">
+                  <input type="checkbox" checked={!!fm.round_taxable_income} onChange={e => setF('round_taxable_income', e.target.checked)} className="h-4 w-4 mt-0.5 rounded border-slate-300" />
+                  <span>
+                    <span className="block text-sm font-medium text-slate-800">{t("Arrondir le revenu imposable")}</span>
+                    <span className="block text-xs text-slate-500 mt-0.5">{t("Le revenu imposable mensuel est arrondi au millier inférieur avant le calcul de l'IRPP (204 333 devient 204 000).")}</span>
+                  </span>
+                </label>
               </div>
             ))}
           </div>

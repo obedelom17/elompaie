@@ -70,12 +70,24 @@ export default function AuthPage() {
       </aside>
 
       <main className="flex-1 flex flex-col">
-        <div className="flex items-center justify-between p-4 lg:p-6">
-          <div className="lg:hidden"><Logo size={26} /></div>
-          <div className="ml-auto"><LanguageSwitch /></div>
+        {/* Mobile : bandeau avec la photo, le panneau latéral étant masqué */}
+        <div className="relative lg:hidden h-44 bg-primary-800 overflow-hidden text-white">
+          <img src="/auth-bg.jpg" alt="" aria-hidden className="absolute inset-0 w-full h-full object-cover object-[35%_center] opacity-55 mix-blend-luminosity" />
+          <div className="absolute inset-0 bg-primary-800/40" aria-hidden />
+          <div className="relative flex items-center justify-between p-4">
+            <Logo size={26} light />
+            <LanguageSwitch />
+          </div>
+          <p className="relative px-4 mt-5 text-lg font-semibold leading-snug tracking-tight max-w-[18rem]">
+            {t('Gestion de paie multi-client pour cabinets comptables au Togo')}
+          </p>
         </div>
 
-        <div className="flex-1 flex items-center justify-center px-6 pb-12">
+        <div className="hidden lg:flex justify-end p-6">
+          <LanguageSwitch />
+        </div>
+
+        <div className="flex-1 flex items-center justify-center px-6 py-8 lg:pb-12">
           <div className="w-full max-w-sm">
             <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">{title}</h1>
             <p className="text-sm text-slate-500 mt-1 mb-6">{subtitle}</p>

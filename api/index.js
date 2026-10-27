@@ -18,7 +18,7 @@ const NEON_AUTH_BASE_URL = process.env.NEON_AUTH_BASE_URL
 const DB_URL = () => process.env.DATABASE_URL || process.env.POSTGRES_PRISMA_URL
 
 // Colonnes autorisées en écriture. Les noms de colonnes ne viennent jamais du client.
-const VARIABLE_COLUMNS = ['base_salary','sursalaire','indemnite_grossesse','indemnite_fonction','indemnite_communication','indemnite_logement','indemnite_repas','indemnite_transport','indemnite_anciennete','avance_salaire','remboursement_pret','deduction_forfaitaire','heures_sup_25','heures_sup_50','heures_sup_100','bulletin_url','indemnites_perso']
+const VARIABLE_COLUMNS = ['base_salary','sursalaire','indemnite_grossesse','indemnite_fonction','indemnite_communication','indemnite_logement','indemnite_repas','indemnite_transport','indemnite_anciennete','avance_salaire','remboursement_pret','deduction_forfaitaire','heures_sup_25','heures_sup_50','heures_sup_100','bulletin_url','indemnites_perso','arrondi_imposable']
 const PERIOD_COLUMNS = ['status','closed_at']
 const pick = (obj, allowed) => Object.fromEntries(Object.entries(obj || {}).filter(([k]) => allowed.includes(k)))
 
@@ -35,6 +35,7 @@ function ensureSeniorityColumns() {
       const db = neon(DB_URL())
       await db`ALTER TABLE payroll_variables ADD COLUMN IF NOT EXISTS indemnite_anciennete NUMERIC DEFAULT 0`
       await db`ALTER TABLE payroll_variables ADD COLUMN IF NOT EXISTS indemnites_perso JSONB DEFAULT '[]'::jsonb`
+      await db`ALTER TABLE payroll_variables ADD COLUMN IF NOT EXISTS arrondi_imposable BOOLEAN DEFAULT FALSE`
     })().catch(err => { seniorityColumnsReady = null; console.warn('[schema] anciennete:', err.message) })
   }
   return seniorityColumnsReady
@@ -1404,6 +1405,7 @@ export default async function handler(req, res) {
         const emp=await sql('SELECT 1 FROM employees e JOIN payroll_periods pp ON pp.client_id=e.client_id WHERE e.id=$1 AND pp.id=$2',[b.employee_id,b.period_id])
         if (!emp.rows.length) return res.status(403).json({ error:'Accès refusé' })
         const values=pick(b, VARIABLE_COLUMNS)
+        if ('arrondi_imposable' in values) values.arrondi_imposable = values.arrondi_imposable === true
         if ('indemnites_perso' in values) values.indemnites_perso = JSON.stringify(parseCustomAllowances(values.indemnites_perso))
         const keys=Object.keys(values)
         const ex=await sql('SELECT id FROM payroll_variables WHERE period_id=$1 AND employee_id=$2',[b.period_id,b.employee_id])

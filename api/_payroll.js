@@ -110,7 +110,8 @@ export function calcPayrollFromRow(v) {
   const revenuAnnuel  = brutImposable * 12
   const abatAnnuel    = Math.round(Math.min(revenuAnnuel, 10_000_000) * 0.28)
   const personnes     = calcPersonnesCharge(v.marital_status, n(v.children_count))
-  const imposable     = Math.floor(Math.max(0, revenuAnnuel - abatAnnuel - personnes * 10_000 * 12) / 1000) * 1000
+  let imposable       = Math.floor(Math.max(0, revenuAnnuel - abatAnnuel - personnes * 10_000 * 12) / 1000) * 1000
+  if (v.arrondi_imposable === true) imposable = Math.floor(Math.round(imposable / 12) / 1000) * 1000 * 12
   const irpp          = Math.round(calcIrppAnnuel(imposable) / 12)
 
   const avance = n(v.avance_salaire)
